@@ -1,0 +1,63 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 2 * * 1' # Every Monday at 2 AM
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64
+        push: false
+        tags: flutter-docker-builder:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          FLUTTER_VERSION=${{ vars.FLUTTER_VERSION || '3.32.4' }}
+          ANDROID_API_LEVEL=${{ vars.ANDROID_API_LEVEL || '35' }}
+          JAVA_VERSION=${{ vars.JAVA_VERSION || '17' }}
+          NDK_VERSION=${{ vars.NDK_VERSION || '27.0.12077973' }}
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'flutter-docker-builder:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Trivy vulnerability scanner (table)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'flutter-docker-builder:latest'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH' 

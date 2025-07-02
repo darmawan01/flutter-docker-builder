@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          FLUTTER_VERSION=${{ vars.FLUTTER_VERSION || '3.32.4' }}
+          ANDROID_API_LEVEL=${{ vars.ANDROID_API_LEVEL || '35' }}
+          JAVA_VERSION=${{ vars.JAVA_VERSION || '17' }}
+          NDK_VERSION=${{ vars.NDK_VERSION || '27.0.12077973' }}
+
+    - name: Generate release notes
+      id: release_notes
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: commits } = await github.rest.repos.compareCommits({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            base: 'main',
+            head: context.sha
+          });
+          
+          const changes = commits.commits.map(commit => 
+            `- ${commit.commit.message.split('\n')[0]}`
+          ).join('\n');
+          
+          return changes;
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref_name }}
+        body: |
+          ## 🚀 Flutter Docker Builder ${{ github.ref_name }}
+          
+          ### What's Changed
+          ${{ steps.release_notes.outputs.result }}
+          
+          ### Docker Image
+          ```bash
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          ```
+          
+          ### Usage
+          ```bash
+          docker run --rm \
+            -v "$PROJECT_DIR:/app" \
+            -v "$OUTPUT_DIR:/output" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          ```
+          
+          ### Build Arguments
+          - Flutter Version: ${{ vars.FLUTTER_VERSION || '3.32.4' }}
+          - Android API Level: ${{ vars.ANDROID_API_LEVEL || '35' }}
+          - Java Version: ${{ vars.JAVA_VERSION || '17' }}
+          - NDK Version: ${{ vars.NDK_VERSION || '27.0.12077973' }}
+        draft: false
+        prerelease: false 

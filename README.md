@@ -34,6 +34,18 @@ cd flutter-docker-builder
 docker build -t flutter-docker-builder .
 ```
 
+### Option 2: Use Pre-built Image from Registry
+
+The latest image is automatically built and pushed to Docker Hub:
+
+```bash
+# Pull the latest image
+docker pull ${{ github.repository }}:latest
+
+# Or pull a specific version
+docker pull ${{ github.repository }}:v1.0.0
+```
+
 #### Custom Build Arguments
 
 You can customize the build with these arguments:
@@ -53,13 +65,7 @@ docker build \
 - `JAVA_VERSION`: Java version (default: 17)
 - `NDK_VERSION`: Android NDK version (default: 27.0.12077973)
 
-### Option 2: Pull from Registry
 
-If available in a Docker registry:
-
-```bash
-docker pull <registry>/flutter-docker-builder:latest
-```
 
 ## 🎯 Usage
 
@@ -256,6 +262,53 @@ docker inspect --format='{{.State.Health.Status}}' <container_id>
 4. Test thoroughly
 5. Submit a pull request
 
+## 🔄 CI/CD Pipeline
+
+This project includes automated CI/CD pipelines for building, testing, and releasing Docker images:
+
+### Workflows
+
+1. **Build and Push** (`.github/workflows/docker-build.yml`)
+   - Triggers on pushes to main/master and version tags
+   - Builds multi-platform images (amd64, arm64)
+   - Pushes to Docker Hub with proper tagging
+   - Generates SBOM for security
+
+2. **Security Scan** (`.github/workflows/security-scan.yml`)
+   - Scans Docker images for vulnerabilities using Trivy
+   - Runs on every push and weekly schedule
+   - Uploads results to GitHub Security tab
+
+3. **Test Build** (`.github/workflows/test-build.yml`)
+   - Tests image builds with different Flutter versions
+   - Verifies APK generation works correctly
+   - Matrix testing with multiple configurations
+
+4. **Release** (`.github/workflows/release.yml`)
+   - Creates GitHub releases on version tags
+   - Generates release notes automatically
+   - Pushes latest and versioned tags
+
+### Setup Requirements
+
+To enable the CI/CD pipeline, add these secrets to your GitHub repository:
+
+- `DOCKER_USERNAME`: Your Docker Hub username
+- `DOCKER_PASSWORD`: Your Docker Hub access token
+
+And these variables (optional, for customization):
+- `FLUTTER_VERSION`: Flutter SDK version (default: 3.32.4)
+- `ANDROID_API_LEVEL`: Android API level (default: 35)
+- `JAVA_VERSION`: Java version (default: 17)
+- `NDK_VERSION`: NDK version (default: 27.0.12077973)
+
+### Automated Updates
+
+Dependabot is configured to automatically:
+- Update GitHub Actions to latest versions
+- Update Docker base images
+- Create pull requests for security updates
+
 ## 📄 License
 
 [Add your license information here]
@@ -266,3 +319,4 @@ For issues and questions:
 - Create an issue in the repository
 - Check the troubleshooting section
 - Review the Docker logs: `docker logs <container_id>`
+- Check GitHub Actions for build status

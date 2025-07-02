@@ -1,0 +1,132 @@
+name: Test Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        flutter-version: ['3.32.4', '3.24.5']
+        android-api: ['35', '34']
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64
+        push: false
+        tags: flutter-docker-builder:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          FLUTTER_VERSION=${{ matrix.flutter-version }}
+          ANDROID_API_LEVEL=${{ matrix.android-api }}
+          JAVA_VERSION=17
+          NDK_VERSION=27.0.12077973
+
+    - name: Create test Flutter project
+      run: |
+        mkdir -p test-project
+        cd test-project
+        cat > pubspec.yaml << 'EOF'
+        name: test_app
+        description: A test Flutter application
+        version: 1.0.0+1
+        environment:
+          sdk: '>=3.0.0 <4.0.0'
+        dependencies:
+          flutter:
+            sdk: flutter
+        dev_dependencies:
+          flutter_test:
+            sdk: flutter
+        flutter:
+          uses-material-design: true
+        EOF
+        
+        mkdir -p lib
+        cat > lib/main.dart << 'EOF'
+        import 'package:flutter/material.dart';
+        
+        void main() {
+          runApp(const MyApp());
+        }
+        
+        class MyApp extends StatelessWidget {
+          const MyApp({super.key});
+        
+          @override
+          Widget build(BuildContext context) {
+            return MaterialApp(
+              title: 'Test App',
+              home: Scaffold(
+                appBar: AppBar(
+                  title: const Text('Test App'),
+                ),
+                body: const Center(
+                  child: Text('Hello, Flutter!'),
+                ),
+              ),
+            );
+          }
+        }
+        EOF
+        
+        mkdir -p android
+        cat > android/app/build.gradle << 'EOF'
+        android {
+            compileSdkVersion 34
+            defaultConfig {
+                applicationId "com.example.test_app"
+                minSdkVersion 21
+                targetSdkVersion 34
+                versionCode 1
+                versionName "1.0"
+            }
+        }
+        EOF
+
+    - name: Test Docker image build
+      run: |
+        mkdir -p output
+        docker run --rm \
+          -v "$(pwd)/test-project:/app" \
+          -v "$(pwd)/output:/output" \
+          -e BUILD_MODE=debug \
+          flutter-docker-builder:test
+
+    - name: Verify APK was created
+      run: |
+        if [ -f "output/apk/debug/app-debug.apk" ]; then
+          echo "✅ APK build successful"
+          ls -la output/apk/debug/
+        else
+          echo "❌ APK build failed"
+          exit 1
+        fi
+
+    - name: Test interactive mode
+      run: |
+        echo "Testing interactive mode..."
+        timeout 30s docker run --rm -it \
+          -v "$(pwd)/test-project:/app" \
+          flutter-docker-builder:test \
+          flutter doctor || true
+
+    - name: Cleanup
+      if: always()
+      run: |
+        docker rmi flutter-docker-builder:test || true
+        rm -rf test-project output 
