@@ -38,6 +38,11 @@ jobs:
           JAVA_VERSION=${{ vars.JAVA_VERSION || '17' }}
           NDK_VERSION=${{ vars.NDK_VERSION || '27.0.12077973' }}
 
+    - name: Verify Docker image was built
+      run: |
+        docker images | grep flutter-docker-builder:latest || (echo "❌ Docker image build failed" && exit 1)
+        echo "✅ Docker image built successfully"
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
@@ -46,9 +51,19 @@ jobs:
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
 
+    - name: Check if Trivy results exist
+      run: |
+        if [ -f "trivy-results.sarif" ]; then
+          echo "✅ Trivy scan completed successfully"
+          ls -la trivy-results.sarif
+        else
+          echo "❌ Trivy scan failed - no results file generated"
+          exit 1
+        fi
+
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && hashFiles('trivy-results.sarif') != ''
       with:
         sarif_file: 'trivy-results.sarif'
 

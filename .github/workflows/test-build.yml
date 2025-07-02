@@ -36,10 +36,265 @@ jobs:
           JAVA_VERSION=17
           NDK_VERSION=27.0.12077973
 
-    - name: Copy existing test Flutter project
+    - name: Verify Docker image was built
       run: |
-        # Copy the existing test_app project to test-project for consistency
-        cp -r test_app test-project
+        docker images | grep flutter-docker-builder:test || (echo "❌ Docker image build failed" && exit 1)
+        echo "✅ Docker image built successfully"
+
+    - name: Create test Flutter project
+      run: |
+        mkdir -p test-project
+        cd test-project
+        
+        # Create pubspec.yaml
+        cat > pubspec.yaml << 'EOF'
+        name: test_app
+        description: A test Flutter application
+        version: 1.0.0+1
+        environment:
+          sdk: '>=3.0.0 <4.0.0'
+        dependencies:
+          flutter:
+            sdk: flutter
+        dev_dependencies:
+          flutter_test:
+            sdk: flutter
+        flutter:
+          uses-material-design: true
+        EOF
+        
+        # Create main.dart
+        mkdir -p lib
+        cat > lib/main.dart << 'EOF'
+        import 'package:flutter/material.dart';
+        
+        void main() {
+          runApp(const MyApp());
+        }
+        
+        class MyApp extends StatelessWidget {
+          const MyApp({super.key});
+        
+          @override
+          Widget build(BuildContext context) {
+            return MaterialApp(
+              title: 'Test App',
+              home: Scaffold(
+                appBar: AppBar(
+                  title: const Text('Test App'),
+                ),
+                body: const Center(
+                  child: Text('Hello, Flutter!'),
+                ),
+              ),
+            );
+          }
+        }
+        EOF
+        
+        # Create complete Android configuration
+        mkdir -p android/app/src/main
+        mkdir -p android/app/src/main/kotlin/com/example/test_app
+        
+        # Create build.gradle (project level)
+        cat > android/build.gradle << 'EOF'
+        buildscript {
+            ext.kotlin_version = '1.7.10'
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:7.3.0'
+                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+            }
+        }
+        
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        
+        rootProject.buildDir = '../build'
+        subprojects {
+            project.buildDir = "${rootProject.buildDir}/${project.name}"
+        }
+        subprojects {
+            project.evaluationDependsOn(':app')
+        }
+        
+        tasks.register("clean", Delete) {
+            delete rootProject.buildDir
+        }
+        EOF
+        
+        # Create build.gradle (app level)
+        cat > android/app/build.gradle << 'EOF'
+        def localProperties = new Properties()
+        def localPropertiesFile = rootProject.file('local.properties')
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.withReader('UTF-8') { reader ->
+                localProperties.load(reader)
+            }
+        }
+        
+        def flutterRoot = localProperties.getProperty('flutter.sdk')
+        if (flutterRoot == null) {
+            throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+        }
+        
+        def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+        if (flutterVersionCode == null) {
+            flutterVersionCode = '1'
+        }
+        
+        def flutterVersionName = localProperties.getProperty('flutter.versionName')
+        if (flutterVersionName == null) {
+            flutterVersionName = '1.0'
+        }
+        
+        apply plugin: 'com.android.application'
+        apply plugin: 'kotlin-android'
+        apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+        
+        android {
+            compileSdkVersion flutter.compileSdkVersion
+            ndkVersion flutter.ndkVersion
+        
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_1_8
+                targetCompatibility JavaVersion.VERSION_1_8
+            }
+        
+            kotlinOptions {
+                jvmTarget = '1.8'
+            }
+        
+            sourceSets {
+                main.java.srcDirs += 'src/main/kotlin'
+            }
+        
+            defaultConfig {
+                applicationId "com.example.test_app"
+                minSdkVersion flutter.minSdkVersion
+                targetSdkVersion flutter.targetSdkVersion
+                versionCode flutterVersionCode.toInteger()
+                versionName flutterVersionName
+            }
+        
+            buildTypes {
+                release {
+                    signingConfig signingConfigs.debug
+                }
+            }
+        }
+        
+        flutter {
+            source '../..'
+        }
+        
+        dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+        }
+        EOF
+        
+        # Create settings.gradle
+        cat > android/settings.gradle << 'EOF'
+        include ':app'
+        
+        def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
+        def properties = new Properties()
+        
+        assert localPropertiesFile.exists()
+        localPropertiesFile.withReader("UTF-8") { reader -> properties.load(reader) }
+        
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        apply from: "$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
+        EOF
+        
+        # Create gradle.properties
+        cat > android/gradle.properties << 'EOF'
+        org.gradle.jvmargs=-Xmx1536M
+        android.useAndroidX=true
+        android.enableJetifier=true
+        EOF
+        
+        # Create gradle wrapper properties
+        mkdir -p android/gradle/wrapper
+        cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-all.zip
+        EOF
+        
+        # Create AndroidManifest.xml
+        cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <application
+                android:label="test_app"
+                android:name="${applicationName}"
+                android:icon="@mipmap/ic_launcher">
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true"
+                    android:launchMode="singleTop"
+                    android:theme="@style/LaunchTheme"
+                    android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                    android:hardwareAccelerated="true"
+                    android:windowSoftInputMode="adjustResize">
+                    <meta-data
+                      android:name="io.flutter.embedding.android.NormalTheme"
+                      android:resource="@style/NormalTheme"
+                      />
+                    <intent-filter android:autoVerify="true">
+                        <action android:name="android.intent.action.MAIN"/>
+                        <category android:name="android.intent.category.LAUNCHER"/>
+                    </intent-filter>
+                </activity>
+                <meta-data
+                    android:name="flutterEmbedding"
+                    android:value="2" />
+            </application>
+        </manifest>
+        EOF
+        
+        # Create MainActivity.kt
+        cat > android/app/src/main/kotlin/com/example/test_app/MainActivity.kt << 'EOF'
+        package com.example.test_app
+        
+        import io.flutter.embedding.android.FlutterActivity
+        
+        class MainActivity: FlutterActivity() {
+        }
+        EOF
+        
+        # Create styles.xml
+        mkdir -p android/app/src/main/res/values
+        cat > android/app/src/main/res/values/styles.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+                <item name="android:windowBackground">@drawable/launch_background</item>
+            </style>
+            <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+                <item name="android:windowBackground">?android:colorBackground</item>
+            </style>
+        </resources>
+        EOF
+        
+        # Create launch_background.xml
+        mkdir -p android/app/src/main/res/drawable
+        cat > android/app/src/main/res/drawable/launch_background.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:drawable="@android:color/white" />
+        </layer-list>
+        EOF
 
     - name: Test Docker image build
       run: |
