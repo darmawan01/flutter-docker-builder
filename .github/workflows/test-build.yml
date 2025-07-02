@@ -36,67 +36,10 @@ jobs:
           JAVA_VERSION=17
           NDK_VERSION=27.0.12077973
 
-    - name: Create test Flutter project
+    - name: Copy existing test Flutter project
       run: |
-        mkdir -p test-project
-        cd test-project
-        cat > pubspec.yaml << 'EOF'
-        name: test_app
-        description: A test Flutter application
-        version: 1.0.0+1
-        environment:
-          sdk: '>=3.0.0 <4.0.0'
-        dependencies:
-          flutter:
-            sdk: flutter
-        dev_dependencies:
-          flutter_test:
-            sdk: flutter
-        flutter:
-          uses-material-design: true
-        EOF
-        
-        mkdir -p lib
-        cat > lib/main.dart << 'EOF'
-        import 'package:flutter/material.dart';
-        
-        void main() {
-          runApp(const MyApp());
-        }
-        
-        class MyApp extends StatelessWidget {
-          const MyApp({super.key});
-        
-          @override
-          Widget build(BuildContext context) {
-            return MaterialApp(
-              title: 'Test App',
-              home: Scaffold(
-                appBar: AppBar(
-                  title: const Text('Test App'),
-                ),
-                body: const Center(
-                  child: Text('Hello, Flutter!'),
-                ),
-              ),
-            );
-          }
-        }
-        EOF
-        
-        mkdir -p android
-        cat > android/app/build.gradle << 'EOF'
-        android {
-            compileSdkVersion 34
-            defaultConfig {
-                applicationId "com.example.test_app"
-                minSdkVersion 21
-                targetSdkVersion 34
-                versionCode 1
-                versionName "1.0"
-            }
-        }
-        EOF
+        # Copy the existing test_app project to test-project for consistency
+        cp -r test_app test-project
 
     - name: Test Docker image build
       run: |
