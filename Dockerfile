@@ -18,7 +18,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=en_US.UTF-8 \
     ANDROID_HOME="/opt/android-sdk" \
     FLUTTER_HOME="/opt/flutter" \
-    JAVA_HOME="/usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64"
+    JAVA_HOME="/usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64" \
+    FLUTTER_BUILD_DIR="/home/flutter/projects/build" \
+    PUB_CACHE="/home/flutter/.pub-cache"
 
 ENV ANDROID_SDK_ROOT="$ANDROID_HOME" \
     PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/ndk/$NDK_VERSION:$FLUTTER_HOME/bin"
@@ -57,7 +59,7 @@ RUN useradd -m -s /bin/bash flutter && \
     mkdir -p $ANDROID_HOME $FLUTTER_HOME && \
     chown -R flutter:flutter $ANDROID_HOME $FLUTTER_HOME && \
     # Ensure flutter user can access common directories
-    mkdir -p /home/flutter/.pub-cache && \
+    mkdir -p $PUB_CACHE && \
     chown -R flutter:flutter /home/flutter && \
     mkdir -p /output && \
     chown -R flutter:flutter /output && \

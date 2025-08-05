@@ -73,7 +73,7 @@ if [ -n "$FLAVOR" ]; then
 fi
 
 if [ "$OBFUSCATE" = "true" ]; then
-    BUILD_CMD="$BUILD_CMD --obfuscate --split-debug-info=/app/debug-info"
+    BUILD_CMD="$BUILD_CMD --obfuscate --split-debug-info=/home/flutter/projects/debug-info"
 fi
 
 if [ "$SHRINK" = "true" ]; then
@@ -108,8 +108,9 @@ show_info "Target directory: ${TARGET_DIR}"
 show_info "Output directory: ${OUTPUT_DIR}"
 echo ""
 
-# Step 1: Copy project files
-show_progress "Copying project files from ${SOURCE_DIR} to ${TARGET_DIR}..."
+# Step 1: Clean target directory and copy project files
+show_progress "Cleaning target directory and copying project files..."
+rm -rf $TARGET_DIR/*
 if cp -r $SOURCE_DIR/* $TARGET_DIR 2>/dev/null; then
     show_success "Project files copied successfully"
 else
@@ -117,22 +118,26 @@ else
     exit 1
 fi
 
-# Step 2: Fix permissions
+# Step 2: Fix permissions and ensure proper ownership
 show_progress "Setting correct file permissions..."
-if chown -R flutter:flutter /home/flutter/projects; then
-    show_success "File permissions updated"
-else
-    show_warning "Could not update all file permissions (this might be normal)"
-fi
+chown -R flutter:flutter $TARGET_DIR
+chmod -R 755 $TARGET_DIR
+show_success "File permissions updated"
 echo ""
 
-# Step 3: Navigate to project directory
+# Step 3: Navigate to project directory and ensure we're in the right place
 show_progress "Navigating to project directory..."
 cd $TARGET_DIR
 show_success "Working directory: $(pwd)"
 echo ""
 
-# Step 4: Install dependencies
+# Step 4: Clean any existing build artifacts
+show_progress "Cleaning existing build artifacts..."
+flutter clean
+show_success "Build artifacts cleaned"
+echo ""
+
+# Step 5: Install dependencies
 show_progress "Installing Flutter dependencies..."
 if flutter pub get; then
     show_success "Dependencies installed successfully"
@@ -142,10 +147,24 @@ else
 fi
 echo ""
 
-# Step 5: Build APK
+# Step 6: Verify Flutter doctor
+show_progress "Verifying Flutter installation..."
+if flutter doctor; then
+    show_success "Flutter installation verified"
+else
+    show_warning "Flutter doctor reported issues, but continuing with build"
+fi
+echo ""
+
+# Step 7: Build APK
 show_progress "Building APK with command:"
 echo -e "${YELLOW}${BUILD_CMD}${NC}"
 echo ""
+
+# Set environment to ensure build happens in container
+export FLUTTER_BUILD_DIR="$TARGET_DIR/build"
+export ANDROID_SDK_ROOT="/opt/android-sdk"
+export ANDROID_HOME="/opt/android-sdk"
 
 if eval $BUILD_CMD; then
     show_success "APK build completed successfully!"
@@ -155,7 +174,7 @@ else
 fi
 echo ""
 
-# Step 6: Copy APK files back
+# Step 8: Copy APK files back
 show_progress "Copying APK files to output directory..."
 if [ -d "build/app/outputs/apk" ]; then
     cp -r build/app/outputs/apk/* $OUTPUT_DIR/
@@ -166,7 +185,7 @@ else
 fi
 echo ""
 
-# Step 7: Display results
+# Step 9: Display results
 echo -e "${WHITE}${FOLDER} Generated APK Files:${NC}"
 
 if ls -la $OUTPUT_DIR/*/*.apk 2>/dev/null; then

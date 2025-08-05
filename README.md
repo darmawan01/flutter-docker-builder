@@ -12,6 +12,7 @@ A modern, production-ready Docker image for building Flutter applications with A
 - **Health checks** for container monitoring
 - **Configurable build options** (flavor, obfuscation, shrinking, etc.)
 - **Beautiful colored output** with progress indicators
+- **Proper isolation** to prevent host system path conflicts
 
 ## 📋 Prerequisites
 
@@ -65,11 +66,27 @@ docker build \
 - `JAVA_VERSION`: Java version (default: 17)
 - `NDK_VERSION`: Android NDK version (default: 27.0.12077973)
 
-
-
 ## 🎯 Usage
 
-### Basic Usage
+### Quick Start with Build Script
+
+The easiest way to build APKs is using the provided build script:
+
+```bash
+# Build release APK
+./build-apk.sh
+
+# Build with custom options
+./build-apk.sh --project-dir /path/to/project --output-dir ./apks --build-mode release
+
+# Build with flavor
+./build-apk.sh --flavor production
+
+# Build with obfuscation
+./build-apk.sh --obfuscate --shrink
+```
+
+### Basic Docker Usage
 
 ```bash
 docker run --rm \
@@ -230,6 +247,32 @@ docker run --rm \
      -v "$PROJECT_DIR:/app" \
      -v "$OUTPUT_DIR:/output" \
      flutter-docker-builder:latest /bin/bash
+   ```
+
+4. **Directory Creation Error**
+   
+   If you encounter an error like:
+   ```
+   Failed to create parent directory '/Users' when creating directory '/Users/zd/Nguli/alexys/aptus_aware3/build/app/intermediates/flutter/release/arm64-v8a'
+   ```
+   
+   This happens when the build process tries to access host system paths. The fix includes:
+   
+   - **Use the build script**: `./build-apk.sh` handles proper isolation
+   - **Ensure proper volume mounting**: Use absolute paths for project and output directories
+   - **Clean build environment**: The container now cleans build artifacts before building
+   - **Proper environment variables**: Set `FLUTTER_BUILD_DIR` and other paths within the container
+   
+   ```bash
+   # Use the build script (recommended)
+   ./build-apk.sh --project-dir /path/to/project --output-dir ./output
+   
+   # Or ensure proper Docker run command
+   docker run --rm \
+     -v "$(realpath /path/to/project):/app" \
+     -v "$(realpath ./output):/output" \
+     -e FLUTTER_BUILD_DIR="/home/flutter/projects/build" \
+     flutter-docker-builder:latest
    ```
 
 ### Health Check
