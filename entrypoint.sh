@@ -22,6 +22,36 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
+# Function to check and cleanup disk space
+check_disk_space() {
+    local available_space=$(df . | awk 'NR==2 {print $4}')
+    local available_gb=$((available_space / 1024 / 1024))
+    
+    if [ $available_gb -lt 5 ]; then
+        show_warning "Low disk space detected: ${available_gb}GB available"
+        show_info "Attempting to clean up temporary files..."
+        
+        # Clean up common temporary directories
+        rm -rf /tmp/* 2>/dev/null || true
+        rm -rf /var/tmp/* 2>/dev/null || true
+        rm -rf /home/flutter/.pub-cache/tmp/* 2>/dev/null || true
+        
+        # Clean up Flutter build cache
+        flutter clean 2>/dev/null || true
+        
+        # Check space after cleanup
+        local new_available_space=$(df . | awk 'NR==2 {print $4}')
+        local new_available_gb=$((new_available_space / 1024 / 1024))
+        show_info "After cleanup: ${new_available_gb}GB available"
+        
+        if [ $new_available_gb -lt 2 ]; then
+            show_error "Still insufficient disk space after cleanup"
+            return 1
+        fi
+    fi
+    return 0
+}
+
 # Unicode symbols
 CHECK_MARK="✅"
 CROSS_MARK="❌"
@@ -110,50 +140,124 @@ echo ""
 
 # Step 1: Clean target directory and copy project files
 show_progress "Cleaning target directory and copying project files..."
-rm -rf $TARGET_DIR/*
-if cp -r $SOURCE_DIR/* $TARGET_DIR 2>/dev/null; then
-    show_success "Project files copied successfully"
-else
-    show_error "Failed to copy project files"
+
+# Optional disk space check and analysis
+if [ "${DEBUG_AVAILABLE_SPACE:-false}" = "true" ]; then
+    show_info "=== Disk Space Analysis (Debug Mode) ==="
+    
+    # Check disk space
+    show_info "Available disk space:"
+    df -h . 2>/dev/null || show_error "Cannot check disk space"
+
+    # Show disk usage by directory
+    show_info "Disk usage by directory (top 10):"
+    du -h --max-depth=1 / 2>/dev/null | sort -hr | head -10 || show_error "Cannot check disk usage by directory"
+
+    # Show largest files in common directories
+    show_info "Largest files in /tmp:"
+    find /tmp -type f -exec du -h {} + 2>/dev/null | sort -hr | head -5 || show_info "No files in /tmp"
+
+    show_info "Largest files in /var/tmp:"
+    find /var/tmp -type f -exec du -h {} + 2>/dev/null | sort -hr | head -5 || show_info "No files in /var/tmp"
+
+    show_info "Largest files in /home/flutter:"
+    find /home/flutter -type f -exec du -h {} + 2>/dev/null | sort -hr | head -5 || show_info "No files in /home/flutter"
+
+    # Show largest files in current directory
+    show_info "Largest files in current directory:"
+    find . -type f -exec du -h {} + 2>/dev/null | sort -hr | head -5 || show_info "No files in current directory"
+
+    # Show largest files in /opt (Android SDK, Flutter)
+    show_info "Largest files in /opt:"
+    find /opt -type f -exec du -h {} + 2>/dev/null | sort -hr | head -5 || show_info "No files in /opt"
+
+    # Check and cleanup disk space if needed
+    if ! check_disk_space; then
+        show_error "Insufficient disk space for build"
+        exit 1
+    fi
+    
+    show_info "=== End Disk Space Analysis ==="
+    echo ""
+fi
+
+# Ensure target directory exists
+if ! mkdir -p $TARGET_DIR 2>/dev/null; then
+    show_error "Failed to create target directory"
     exit 1
 fi
 
+# Clean target directory
+if ! rm -rf $TARGET_DIR/* 2>/dev/null; then
+    show_error "Failed to clean target directory"
+    exit 1
+fi
+
+# Copy project files with error handling
+show_info "Copying project files..."
+if ! cp -r $SOURCE_DIR/* $TARGET_DIR/ 2>/dev/null; then
+    show_error "Failed to copy project files"
+    show_info "Error details:"
+    cp -r $SOURCE_DIR/* $TARGET_DIR/ 2>&1 || true
+    show_info "Available space:"
+    df -h . 2>/dev/null || true
+    exit 1
+fi
+
+show_success "Project files copied successfully"
+
 # Step 2: Fix permissions and ensure proper ownership
 show_progress "Setting correct file permissions..."
-chown -R flutter:flutter $TARGET_DIR
-chmod -R 755 $TARGET_DIR
+
+if ! chown -R flutter:flutter $TARGET_DIR 2>/dev/null; then
+    show_error "Failed to set ownership"
+    exit 1
+fi
+
+if ! chmod -R 755 $TARGET_DIR 2>/dev/null; then
+    show_error "Failed to set permissions"
+    exit 1
+fi
+
 show_success "File permissions updated"
 echo ""
 
 # Step 3: Navigate to project directory and ensure we're in the right place
 show_progress "Navigating to project directory..."
-cd $TARGET_DIR
+if ! cd $TARGET_DIR 2>/dev/null; then
+    show_error "Failed to navigate to project directory"
+    exit 1
+fi
 show_success "Working directory: $(pwd)"
 echo ""
 
 # Step 4: Clean any existing build artifacts
 show_progress "Cleaning existing build artifacts..."
-flutter clean
+if ! flutter clean 2>/dev/null; then
+    show_error "Failed to clean build artifacts"
+    exit 1
+fi
 show_success "Build artifacts cleaned"
 echo ""
 
 # Step 5: Install dependencies
 show_progress "Installing Flutter dependencies..."
-if flutter pub get; then
-    show_success "Dependencies installed successfully"
-else
+if ! flutter pub get 2>/dev/null; then
     show_error "Failed to install dependencies"
+    show_info "Error details:"
+    flutter pub get 2>&1 || true
     exit 1
 fi
+show_success "Dependencies installed successfully"
 echo ""
 
 # Step 6: Verify Flutter doctor
 show_progress "Verifying Flutter installation..."
-if flutter doctor; then
-    show_success "Flutter installation verified"
-else
+if ! flutter doctor 2>/dev/null; then
     show_warning "Flutter doctor reported issues, but continuing with build"
+    flutter doctor 2>&1 || true
 fi
+show_success "Flutter installation verified"
 echo ""
 
 # Step 7: Build APK
@@ -166,23 +270,29 @@ export FLUTTER_BUILD_DIR="$TARGET_DIR/build"
 export ANDROID_SDK_ROOT="/opt/android-sdk"
 export ANDROID_HOME="/opt/android-sdk"
 
-if eval $BUILD_CMD; then
-    show_success "APK build completed successfully!"
-else
+if ! eval $BUILD_CMD 2>/dev/null; then
     show_error "APK build failed"
+    show_info "Error details:"
+    eval $BUILD_CMD 2>&1 || true
     exit 1
 fi
+show_success "APK build completed successfully!"
 echo ""
 
 # Step 8: Copy APK files back
 show_progress "Copying APK files to output directory..."
-if [ -d "build/app/outputs/apk" ]; then
-    cp -r build/app/outputs/apk/* $OUTPUT_DIR/
-    show_success "APK files copied to ${OUTPUT_DIR}"
-else
+if [ ! -d "build/app/outputs/apk" ]; then
     show_error "APK output directory not found"
     exit 1
 fi
+
+if ! cp -r build/app/outputs/apk/* $OUTPUT_DIR/ 2>/dev/null; then
+    show_error "Failed to copy APK files to output directory"
+    show_info "Error details:"
+    cp -r build/app/outputs/apk/* $OUTPUT_DIR/ 2>&1 || true
+    exit 1
+fi
+show_success "APK files copied to ${OUTPUT_DIR}"
 echo ""
 
 # Step 9: Display results
