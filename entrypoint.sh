@@ -116,11 +116,26 @@ detect_and_handle_alpine() {
         fi
 
         # Android tools compatibility fixes
-        export LD_LIBRARY_PATH="/usr/glibc-compat/lib:$LD_LIBRARY_PATH"
+        export LD_LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:$LD_LIBRARY_PATH"
+        export LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:$LIBRARY_PATH"
         export ANDROID_AAPT2_FROM_MAVEN_OVERRIDE="/opt/android-sdk/build-tools/35.0.0/aapt2"
         export ANDROID_AAPT2_DAEMON_MODE=false
         export CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION=clang
         export GLIBC_TUNABLES=glibc.pthread.stack_cache_size=0
+        export AAPT2_DAEMON_ENABLED=false
+
+        # Create additional runtime symlinks for better compatibility
+        show_info "Creating additional library symlinks for Android tools"
+        mkdir -p /usr/lib/x86_64-linux-gnu 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libc.so.6 /usr/lib/x86_64-linux-gnu/libc.so.6 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libm.so.6 /usr/lib/x86_64-linux-gnu/libm.so.6 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libdl.so.2 /usr/lib/x86_64-linux-gnu/libdl.so.2 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libpthread.so.0 /usr/lib/x86_64-linux-gnu/libpthread.so.0 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libresolv.so.2 /usr/lib/x86_64-linux-gnu/libresolv.so.2 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/librt.so.1 /usr/lib/x86_64-linux-gnu/librt.so.1 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libutil.so.1 /usr/lib/x86_64-linux-gnu/libutil.so.1 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so.6 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 2>/dev/null || true
 
         show_success "Alpine compatibility fixes applied"
     fi
@@ -311,6 +326,25 @@ if [ -d "android" ]; then
     mkdir -p android
     echo "sdk.dir=/opt/android-sdk" > android/local.properties
     echo "flutter.sdk=/opt/flutter" >> android/local.properties
+    
+    # Add Alpine-specific Android configuration
+    if [ -f /etc/alpine-release ]; then
+        show_info "Configuring Alpine-specific Android settings"
+        # Create gradle.properties with Alpine optimizations
+        cat > android/gradle.properties << EOF
+org.gradle.jvmargs=-Xmx2g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false
+org.gradle.configureondemand=false
+android.useAndroidX=true
+android.enableJetifier=true
+android.enableR8.fullMode=false
+android.enableAapt2=false
+android.enableD8.desugaring=false
+android.enableBuildCache=false
+android.enableDexingArtifactTransform=false
+EOF
+        show_success "Alpine-specific Android configuration added"
+    fi
+    
     show_success "Android local.properties configured"
 fi
 echo ""
@@ -334,7 +368,12 @@ export FLUTTER_BUILD_DIR="$TARGET_DIR/build"
 export ANDROID_SDK_ROOT="/opt/android-sdk"
 export ANDROID_HOME="/opt/android-sdk"
 export GRADLE_USER_HOME="/home/flutter/.gradle"
-export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.cache.dir=/home/flutter/.gradle/caches"
+# Set Alpine-specific Gradle options if on Alpine
+if [ -f /etc/alpine-release ]; then
+    export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx2g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.cache.dir=/home/flutter/.gradle/caches -Dorg.gradle.configureondemand=false"
+else
+    export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.cache.dir=/home/flutter/.gradle/caches"
+fi
 
 # Pre-initialize Gradle to avoid permission issues
 show_progress "Pre-initializing Gradle cache..."

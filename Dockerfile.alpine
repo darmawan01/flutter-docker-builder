@@ -22,8 +22,8 @@ ENV LANG=en_US.UTF-8 \
     JAVA_HOME="/usr/lib/jvm/java-${JAVA_VERSION}-openjdk" \
     FLUTTER_BUILD_DIR="/home/flutter/projects/build" \
     PUB_CACHE="/home/flutter/.pub-cache" \
-    ANDROID_SDK_ROOT="$ANDROID_HOME" \
-    PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/ndk/$NDK_VERSION:$FLUTTER_HOME/bin:/usr/glibc-compat/bin"
+    ANDROID_SDK_ROOT="/opt/android-sdk" \
+    PATH="$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/ndk/${NDK_VERSION}:/opt/flutter/bin:/usr/glibc-compat/bin"
 
 # Install system dependencies with additional build tools
 RUN apk add --no-cache \
@@ -59,20 +59,22 @@ RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/s
     && rm -f glibc-*.apk
 
 # Enhanced library linking for Android tools
-RUN mkdir -p /lib64 \
+RUN mkdir -p /lib64 /usr/lib64 \
     && ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 \
     && ln -sf /usr/glibc-compat/lib/libc.so.6 /usr/lib/libc.so.6 \
     && ln -sf /usr/glibc-compat/lib/libm.so.6 /usr/lib/libm.so.6 \
     && ln -sf /usr/glibc-compat/lib/libdl.so.2 /usr/lib/libdl.so.2 \
     && ln -sf /usr/glibc-compat/lib/libpthread.so.0 /usr/lib/libpthread.so.0 \
     && ln -sf /usr/glibc-compat/lib/librt.so.1 /usr/lib/librt.so.1 \
-    && ln -sf /usr/glibc-compat/lib/libutil.so.1 /usr/lib/libutil.so.1
+    && ln -sf /usr/glibc-compat/lib/libutil.so.1 /usr/lib/libutil.so.1 \
+    && ln -sf /usr/glibc-compat/lib/libresolv.so.2 /usr/lib/libresolv.so.2 \
+    && ln -sf /usr/glibc-compat/lib/libstdc++.so.6 /usr/lib/libstdc++.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so.1
 
 # Add additional libraries needed by Android tools
 RUN apk add --no-cache \
     libc6-compat \
     libstdc++ \
-    gcompat \
     cmake \
     ninja
 
