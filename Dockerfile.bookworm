@@ -64,7 +64,11 @@ RUN useradd -m -s /bin/bash flutter && \
     chown -R flutter:flutter /home/flutter && \
     mkdir -p /output && \
     chown -R flutter:flutter /output && \
-    chmod 755 /output
+    chmod 755 /output && \
+    # Create Gradle cache directory with proper permissions
+    mkdir -p /home/flutter/.gradle && \
+    chown -R flutter:flutter /home/flutter/.gradle && \
+    chmod -R 755 /home/flutter/.gradle
 
 # Install Android SDK Command Line Tools as flutter user
 USER flutter

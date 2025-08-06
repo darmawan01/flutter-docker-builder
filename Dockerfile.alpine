@@ -73,7 +73,10 @@ RUN apk add --no-cache cmake ninja
 RUN adduser -D -h /home/flutter flutter \
     && mkdir -p "$ANDROID_HOME" "$FLUTTER_HOME" "$PUB_CACHE" /output "$FLUTTER_BUILD_DIR" /home/flutter/.android \
     && touch /home/flutter/.android/repositories.cfg \
-    && chown -R flutter:flutter /home/flutter "$ANDROID_HOME" "$FLUTTER_HOME" /output
+    && chown -R flutter:flutter /home/flutter "$ANDROID_HOME" "$FLUTTER_HOME" /output \
+    && mkdir -p /home/flutter/.gradle \
+    && chown -R flutter:flutter /home/flutter/.gradle \
+    && chmod -R 755 /home/flutter/.gradle
 
 # Install Android SDK Command Line Tools as root
 RUN curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip" -o /tmp/cmdline-tools.zip \

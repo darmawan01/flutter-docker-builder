@@ -240,6 +240,23 @@ if ! chmod -R 755 $TARGET_DIR 2>/dev/null; then
     exit 1
 fi
 
+# Ensure Gradle cache directory exists with proper permissions
+show_progress "Setting up Gradle cache directory..."
+if ! mkdir -p /home/flutter/.gradle 2>/dev/null; then
+    show_error "Failed to create Gradle cache directory"
+    exit 1
+fi
+
+if ! chown -R flutter:flutter /home/flutter/.gradle 2>/dev/null; then
+    show_error "Failed to set Gradle cache ownership"
+    exit 1
+fi
+
+if ! chmod -R 755 /home/flutter/.gradle 2>/dev/null; then
+    show_error "Failed to set Gradle cache permissions"
+    exit 1
+fi
+
 show_success "File permissions updated"
 echo ""
 
@@ -250,6 +267,13 @@ if ! cd $TARGET_DIR 2>/dev/null; then
     exit 1
 fi
 show_success "Working directory: $(pwd)"
+
+# Fix Gradle wrapper permissions if it exists
+if [ -f "android/gradlew" ]; then
+    show_progress "Fixing Gradle wrapper permissions..."
+    chmod +x android/gradlew
+    show_success "Gradle wrapper permissions fixed"
+fi
 echo ""
 
 # Clean any existing build artifacts
@@ -270,6 +294,15 @@ if ! flutter pub get 2>/dev/null; then
     exit 1
 fi
 show_success "Dependencies installed successfully"
+
+# Ensure Android local.properties is properly configured
+if [ -d "android" ]; then
+    show_progress "Configuring Android local.properties..."
+    mkdir -p android
+    echo "sdk.dir=/opt/android-sdk" > android/local.properties
+    echo "flutter.sdk=/opt/flutter" >> android/local.properties
+    show_success "Android local.properties configured"
+fi
 echo ""
 
 # Verify Flutter doctor
@@ -290,11 +323,38 @@ echo ""
 export FLUTTER_BUILD_DIR="$TARGET_DIR/build"
 export ANDROID_SDK_ROOT="/opt/android-sdk"
 export ANDROID_HOME="/opt/android-sdk"
+export GRADLE_USER_HOME="/home/flutter/.gradle"
+export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.cache.dir=/home/flutter/.gradle/caches"
+
+# Pre-initialize Gradle to avoid permission issues
+show_progress "Pre-initializing Gradle cache..."
+# Ensure Gradle cache directory exists and has proper permissions
+mkdir -p /home/flutter/.gradle/caches
+mkdir -p /home/flutter/.gradle/wrapper
+chmod -R 755 /home/flutter/.gradle
+show_success "Gradle cache directory prepared"
+echo ""
 
 if ! eval $BUILD_CMD 2>/dev/null; then
     show_error "APK build failed"
     show_info "Error details:"
     eval $BUILD_CMD 2>&1 || true
+    
+    # Additional diagnostics for Gradle permission issues
+    show_info "=== Additional Diagnostics ==="
+    show_info "Gradle cache directory permissions:"
+    ls -la /home/flutter/.gradle/ 2>/dev/null || show_error "Cannot access Gradle cache directory"
+    
+    show_info "Current user and permissions:"
+    whoami
+    id
+    
+    show_info "Available disk space:"
+    df -h . 2>/dev/null || show_error "Cannot check disk space"
+    
+    show_info "Gradle cache directory contents:"
+    find /home/flutter/.gradle -type d 2>/dev/null | head -10 || show_error "Cannot list Gradle cache contents"
+    
     exit 1
 fi
 show_success "APK build completed successfully!"
