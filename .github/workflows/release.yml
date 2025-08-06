@@ -42,13 +42,6 @@ jobs:
 
     - name: Push Alpine image
       run: |
-        VERSION=${GITHUB_REF#refs/tags/}
-        echo "Pushing Alpine image with tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine"
-        
-        # Tag and push Alpine image
-        docker tag darmawanz01/flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine
-        docker tag darmawanz01/flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
-        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine
         docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
 
     - name: Test APK Build with Alpine Image
@@ -93,14 +86,7 @@ jobs:
 
     - name: Push Ubuntu image
       run: |
-        VERSION=${GITHUB_REF#refs/tags/}
-        echo "Pushing Ubuntu image with tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-        
-        # Tag and push Ubuntu image
-        docker tag darmawanz01/flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
-        docker tag darmawanz01/flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
-        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ubuntu
 
     - name: Test APK Build with Ubuntu Image
       run: |
