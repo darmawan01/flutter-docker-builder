@@ -33,8 +33,6 @@ RUN apk add --no-cache \
     unzip \
     zip \
     openjdk${JAVA_VERSION}-jdk \
-    cmake \
-    ninja \
     pkgconf \
     build-base \
     linux-headers \
@@ -68,18 +66,33 @@ RUN ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.
     && ln -sf /usr/glibc-compat/lib/librt.so.1 /lib64/librt.so.1 \
     && ln -sf /usr/glibc-compat/lib/libutil.so.1 /lib64/libutil.so.1
 
+# Install CMake and Ninja from source for better compatibility
+RUN cd /tmp \
+    && wget -q https://github.com/Kitware/CMake/releases/download/v3.22.1/cmake-3.22.1.tar.gz \
+    && tar xf cmake-3.22.1.tar.gz \
+    && cd cmake-3.22.1 \
+    && ./bootstrap --parallel=$(nproc) \
+    && make -j$(nproc) \
+    && make install \
+    && cd /tmp \
+    && rm -rf cmake-3.22.1* \
+    && wget -q https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-linux.zip \
+    && unzip -q ninja-linux.zip \
+    && mv ninja /usr/local/bin/ \
+    && rm ninja-linux.zip
+
 # Create non-root user and directories
 RUN adduser -D -h /home/flutter flutter \
-    && mkdir -p $ANDROID_HOME $FLUTTER_HOME $PUB_CACHE /output $FLUTTER_BUILD_DIR /home/flutter/.android \
+    && mkdir -p "$ANDROID_HOME" "$FLUTTER_HOME" "$PUB_CACHE" /output "$FLUTTER_BUILD_DIR" /home/flutter/.android \
     && touch /home/flutter/.android/repositories.cfg \
-    && chown -R flutter:flutter /home/flutter $ANDROID_HOME $FLUTTER_HOME /output
+    && chown -R flutter:flutter /home/flutter "$ANDROID_HOME" "$FLUTTER_HOME" /output
 
 # Install Android SDK Command Line Tools as root
 RUN curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip" -o /tmp/cmdline-tools.zip \
-    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools \
-    && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+    && unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools" \
+    && mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" \
     && rm /tmp/cmdline-tools.zip \
-    && chown -R flutter:flutter $ANDROID_HOME
+    && chown -R flutter:flutter "$ANDROID_HOME"
 
 # Install Flutter as root
 RUN if [ -z "$FLUTTER_VERSION" ]; then \
@@ -91,7 +104,7 @@ RUN if [ -z "$FLUTTER_VERSION" ]; then \
         -o /tmp/flutter.tar.xz \
     && tar xf /tmp/flutter.tar.xz -C /opt/ \
     && rm /tmp/flutter.tar.xz \
-    && chown -R flutter:flutter $FLUTTER_HOME
+    && chown -R flutter:flutter "$FLUTTER_HOME"
 
 # Switch to flutter user
 USER flutter
@@ -102,9 +115,9 @@ ENV PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-to
 # Install comprehensive Android SDK packages to avoid runtime downloads
 # This prevents the build process from downloading SDK platforms at runtime
 # which significantly improves build performance and reliability
-RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses \
-    && $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update \
-    && $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+RUN yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses \
+    && "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --update \
+    && "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
         "platform-tools" \
         "platforms;android-${ANDROID_API_LEVEL}" \
         "platforms;android-${ANDROID_MIN_API_LEVEL}" \
@@ -127,13 +140,13 @@ RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses \
         "ndk;${NDK_VERSION}" \
         "cmake;3.22.1" && \
     # Clean up SDK manager cache to reduce image size
-    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat && \
-    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.cmd && \
-    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.exe
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" && \
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.cmd" && \
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.exe"
 
 # Configure Flutter
 RUN flutter precache \
-    && flutter config --android-sdk $ANDROID_HOME \
+    && flutter config --android-sdk "$ANDROID_HOME" \
     && yes | flutter doctor --android-licenses \
     && flutter doctor
 

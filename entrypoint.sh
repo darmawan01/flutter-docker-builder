@@ -95,6 +95,27 @@ show_warning() {
     echo -e "${YELLOW}${WARNING} ${message}${NC}"
 }
 
+# Function to detect Alpine and handle CMake issues
+detect_and_handle_alpine() {
+    if [ -f /etc/alpine-release ]; then
+        show_info "Alpine Linux detected - applying compatibility fixes"
+        
+        # Set environment variables for better Alpine compatibility
+        export CMAKE_BUILD_PARALLEL_LEVEL=1
+        export NINJA_BUILD_PARALLEL_LEVEL=1
+        
+        # Disable problematic optimizations
+        export CFLAGS="-O1"
+        export CXXFLAGS="-O1"
+        
+        # Use alternative CMake configuration for Alpine
+        if [ "$BUILD_MODE" = "release" ]; then
+            show_info "Using Alpine-optimized build configuration"
+            export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx2g -Dorg.gradle.parallel=false"
+        fi
+    fi
+}
+
 # Build command construction
 BUILD_CMD="flutter build apk --${BUILD_MODE} --target-platform=${TARGET_PLATFORM}"
 
@@ -138,8 +159,8 @@ show_info "Target directory: ${TARGET_DIR}"
 show_info "Output directory: ${OUTPUT_DIR}"
 echo ""
 
-# Step 1: Clean target directory and copy project files
-show_progress "Cleaning target directory and copying project files..."
+# Detect and handle Alpine-specific issues
+detect_and_handle_alpine
 
 # Optional disk space check and analysis
 if [ "${DEBUG_AVAILABLE_SPACE:-false}" = "true" ]; then
@@ -206,7 +227,7 @@ fi
 
 show_success "Project files copied successfully"
 
-# Step 2: Fix permissions and ensure proper ownership
+# Fix permissions and ensure proper ownership
 show_progress "Setting correct file permissions..."
 
 if ! chown -R flutter:flutter $TARGET_DIR 2>/dev/null; then
@@ -222,7 +243,7 @@ fi
 show_success "File permissions updated"
 echo ""
 
-# Step 3: Navigate to project directory and ensure we're in the right place
+# Navigate to project directory and ensure we're in the right place
 show_progress "Navigating to project directory..."
 if ! cd $TARGET_DIR 2>/dev/null; then
     show_error "Failed to navigate to project directory"
@@ -231,7 +252,7 @@ fi
 show_success "Working directory: $(pwd)"
 echo ""
 
-# Step 4: Clean any existing build artifacts
+# Clean any existing build artifacts
 show_progress "Cleaning existing build artifacts..."
 if ! flutter clean 2>/dev/null; then
     show_error "Failed to clean build artifacts"
@@ -240,7 +261,7 @@ fi
 show_success "Build artifacts cleaned"
 echo ""
 
-# Step 5: Install dependencies
+# Install dependencies
 show_progress "Installing Flutter dependencies..."
 if ! flutter pub get 2>/dev/null; then
     show_error "Failed to install dependencies"
@@ -251,7 +272,7 @@ fi
 show_success "Dependencies installed successfully"
 echo ""
 
-# Step 6: Verify Flutter doctor
+# Verify Flutter doctor
 show_progress "Verifying Flutter installation..."
 if ! flutter doctor 2>/dev/null; then
     show_warning "Flutter doctor reported issues, but continuing with build"
@@ -260,7 +281,7 @@ fi
 show_success "Flutter installation verified"
 echo ""
 
-# Step 7: Build APK
+# Build APK
 show_progress "Building APK with command:"
 echo -e "${YELLOW}${BUILD_CMD}${NC}"
 echo ""
@@ -279,7 +300,7 @@ fi
 show_success "APK build completed successfully!"
 echo ""
 
-# Step 8: Copy APK files back
+# Copy APK files back
 show_progress "Copying APK files to output directory..."
 if [ ! -d "build/app/outputs/apk" ]; then
     show_error "APK output directory not found"
@@ -295,7 +316,7 @@ fi
 show_success "APK files copied to ${OUTPUT_DIR}"
 echo ""
 
-# Step 9: Display results
+# Display results
 echo -e "${WHITE}${FOLDER} Generated APK Files:${NC}"
 
 if ls -la $OUTPUT_DIR/*/*.apk 2>/dev/null; then
