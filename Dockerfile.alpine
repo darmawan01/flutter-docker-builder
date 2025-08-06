@@ -48,26 +48,33 @@ RUN wget -q -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/down
 
 # Install glibc compatibility layer with improved setup
 RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub \
-    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk \
-    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-bin-${GLIBC_VERSION}.apk \
-    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-i18n-${GLIBC_VERSION}.apk \
-    && apk add --no-cache --force-overwrite glibc-${GLIBC_VERSION}.apk glibc-bin-${GLIBC_VERSION}.apk glibc-i18n-${GLIBC_VERSION}.apk \
+    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.34-r0/glibc-2.34-r0.apk \
+    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.34-r0/glibc-bin-2.34-r0.apk \
+    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.34-r0/glibc-i18n-2.34-r0.apk \
+    && apk add --no-cache --force-overwrite \
+        glibc-2.34-r0.apk \
+        glibc-bin-2.34-r0.apk \
+        glibc-i18n-2.34-r0.apk \
     && /usr/glibc-compat/bin/localedef -i en_US -f UTF-8 en_US.UTF-8 \
-    && rm -f glibc-${GLIBC_VERSION}.apk glibc-bin-${GLIBC_VERSION}.apk glibc-i18n-${GLIBC_VERSION}.apk \
-    && rm -rf /var/cache/apk/*
+    && rm -f glibc-*.apk
 
-# Create symbolic links for better glibc compatibility
-RUN ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 \
-    && ln -sf /usr/glibc-compat/lib/libc.so.6 /lib64/libc.so.6 \
-    && ln -sf /usr/glibc-compat/lib/libm.so.6 /lib64/libm.so.6 \
-    && ln -sf /usr/glibc-compat/lib/libdl.so.2 /lib64/libdl.so.2 \
-    && ln -sf /usr/glibc-compat/lib/libpthread.so.0 /lib64/libpthread.so.0 \
-    && ln -sf /usr/glibc-compat/lib/libresolv.so.2 /lib64/libresolv.so.2 \
-    && ln -sf /usr/glibc-compat/lib/librt.so.1 /lib64/librt.so.1 \
-    && ln -sf /usr/glibc-compat/lib/libutil.so.1 /lib64/libutil.so.1
+# Enhanced library linking for Android tools
+RUN mkdir -p /lib64 \
+    && ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 \
+    && ln -sf /usr/glibc-compat/lib/libc.so.6 /usr/lib/libc.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libm.so.6 /usr/lib/libm.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libdl.so.2 /usr/lib/libdl.so.2 \
+    && ln -sf /usr/glibc-compat/lib/libpthread.so.0 /usr/lib/libpthread.so.0 \
+    && ln -sf /usr/glibc-compat/lib/librt.so.1 /usr/lib/librt.so.1 \
+    && ln -sf /usr/glibc-compat/lib/libutil.so.1 /usr/lib/libutil.so.1
 
-# Install CMake and Ninja from Alpine packages for better compatibility
-RUN apk add --no-cache cmake ninja
+# Add additional libraries needed by Android tools
+RUN apk add --no-cache \
+    libc6-compat \
+    libstdc++ \
+    gcompat \
+    cmake \
+    ninja
 
 # Create non-root user and directories
 RUN adduser -D -h /home/flutter flutter \

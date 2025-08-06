@@ -51,8 +51,6 @@ jobs:
         
         # Build APK using Alpine image and test_app
         ./build.sh build-apk -b alpine -p ./test_app -o ./test_output_alpine
-        
-        ls -la test_output_alpine/apk/
 
   build-push-test-ubuntu:
     runs-on: ubuntu-latest
@@ -95,7 +93,6 @@ jobs:
         
         # Build APK using Ubuntu image and test_app
         ./build.sh build-apk -b ubuntu -p ./test_app -o ./test_output
-        ls -la test_output/apk/
 
   create-release:
     runs-on: ubuntu-latest

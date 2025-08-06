@@ -103,6 +103,7 @@ detect_and_handle_alpine() {
         # Set environment variables for better Alpine compatibility
         export CMAKE_BUILD_PARALLEL_LEVEL=1
         export NINJA_BUILD_PARALLEL_LEVEL=1
+        export NINJA_STATUS="[%f/%t] "
         
         # Disable problematic optimizations
         export CFLAGS="-O1"
@@ -113,6 +114,15 @@ detect_and_handle_alpine() {
             show_info "Using Alpine-optimized build configuration"
             export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx2g -Dorg.gradle.parallel=false"
         fi
+
+        # Android tools compatibility fixes
+        export LD_LIBRARY_PATH="/usr/glibc-compat/lib:$LD_LIBRARY_PATH"
+        export ANDROID_AAPT2_FROM_MAVEN_OVERRIDE="/opt/android-sdk/build-tools/35.0.0/aapt2"
+        export ANDROID_AAPT2_DAEMON_MODE=false
+        export CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION=clang
+        export GLIBC_TUNABLES=glibc.pthread.stack_cache_size=0
+
+        show_success "Alpine compatibility fixes applied"
     fi
 }
 
