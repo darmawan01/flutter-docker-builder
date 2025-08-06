@@ -378,9 +378,6 @@ org.gradle.configureondemand=false
 android.useAndroidX=true
 android.enableJetifier=true
 android.enableR8.fullMode=false
-android.enableD8.desugaring=false
-android.enableBuildCache=false
-android.enableDexingArtifactTransform=false
 EOF
         show_success "Alpine-specific Android configuration added"
     fi
