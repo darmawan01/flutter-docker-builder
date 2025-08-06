@@ -23,7 +23,7 @@ ENV LANG=en_US.UTF-8 \
     FLUTTER_BUILD_DIR="/home/flutter/projects/build" \
     PUB_CACHE="/home/flutter/.pub-cache" \
     ANDROID_SDK_ROOT="/opt/android-sdk" \
-    PATH="$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/ndk/${NDK_VERSION}:/opt/flutter/bin:/usr/glibc-compat/bin"
+    PATH="$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/ndk/${NDK_VERSION}:/opt/flutter/bin:/usr/glibc-compat/bin:/usr/local/bin"
 
 # Install system dependencies with additional build tools
 RUN apk add --no-cache \
@@ -71,12 +71,16 @@ RUN mkdir -p /lib64 /usr/lib64 \
     && ln -sf /usr/glibc-compat/lib/libstdc++.so.6 /usr/lib/libstdc++.so.6 \
     && ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so.1
 
-# Add additional libraries needed by Android tools
-RUN apk add --no-cache \
-    libc6-compat \
-    libstdc++ \
-    cmake \
-    ninja
+# Add additional libraries needed by Android tools (avoiding gcompat conflicts)
+RUN apk add --no-cache libc6-compat && \
+    apk add --no-cache libstdc++ && \
+    apk add --no-cache cmake
+
+# Install ninja manually to avoid gcompat dependency
+RUN wget -q https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip -O /tmp/ninja.zip && \
+    unzip -q /tmp/ninja.zip -d /usr/local/bin && \
+    rm /tmp/ninja.zip && \
+    chmod +x /usr/local/bin/ninja
 
 # Create non-root user and directories
 RUN adduser -D -h /home/flutter flutter \

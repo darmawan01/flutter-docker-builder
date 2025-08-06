@@ -95,6 +95,39 @@ show_warning() {
     echo -e "${YELLOW}${WARNING} ${message}${NC}"
 }
 
+# Function to clean corrupted Gradle cache
+clean_gradle_cache() {
+    if [ -d "/home/flutter/.gradle" ]; then
+        show_info "Cleaning potentially corrupted Gradle cache..."
+        
+        # Remove specific corrupted cache directories
+        rm -rf /home/flutter/.gradle/caches/journal-* 2>/dev/null || true
+        rm -rf /home/flutter/.gradle/caches/modules-* 2>/dev/null || true
+        rm -rf /home/flutter/.gradle/caches/transforms-* 2>/dev/null || true
+        rm -rf /home/flutter/.gradle/caches/build-cache-* 2>/dev/null || true
+        rm -rf /home/flutter/.gradle/caches/file-access.bin 2>/dev/null || true
+        rm -rf /home/flutter/.gradle/caches/fileHashes 2>/dev/null || true
+        rm -rf /home/flutter/.gradle/caches/fileSnapshots 2>/dev/null || true
+        
+        # Clean up any lock files and temporary files
+        find /home/flutter/.gradle -name "*.lock" -delete 2>/dev/null || true
+        find /home/flutter/.gradle -name "*.tmp" -delete 2>/dev/null || true
+        find /home/flutter/.gradle -name "*.part" -delete 2>/dev/null || true
+        find /home/flutter/.gradle -name "*.journal" -delete 2>/dev/null || true
+        
+        # Clean up daemon state
+        rm -rf /home/flutter/.gradle/daemon 2>/dev/null || true
+        rm -rf /home/flutter/.gradle/wrapper 2>/dev/null || true
+        
+        # Recreate essential directories
+        mkdir -p /home/flutter/.gradle/caches/modules-2/files-2.1 2>/dev/null || true
+        mkdir -p /home/flutter/.gradle/caches/transforms-3 2>/dev/null || true
+        mkdir -p /home/flutter/.gradle/caches/build-cache-1 2>/dev/null || true
+        
+        show_success "Gradle cache cleaned and reinitialized"
+    fi
+}
+
 # Function to detect Alpine and handle CMake issues
 detect_and_handle_alpine() {
     if [ -f /etc/alpine-release ]; then
@@ -184,6 +217,9 @@ show_info "Target directory: ${TARGET_DIR}"
 show_info "Output directory: ${OUTPUT_DIR}"
 echo ""
 
+# Clean Gradle cache to prevent corruption issues on all platforms
+clean_gradle_cache
+
 # Detect and handle Alpine-specific issues
 detect_and_handle_alpine
 
@@ -267,7 +303,7 @@ fi
 
 # Ensure Gradle cache directory exists with proper permissions
 show_progress "Setting up Gradle cache directory..."
-if ! mkdir -p /home/flutter/.gradle 2>/dev/null; then
+if ! mkdir -p /home/flutter/.gradle/caches 2>/dev/null; then
     show_error "Failed to create Gradle cache directory"
     exit 1
 fi
@@ -281,6 +317,13 @@ if ! chmod -R 755 /home/flutter/.gradle 2>/dev/null; then
     show_error "Failed to set Gradle cache permissions"
     exit 1
 fi
+
+# Create a fresh Gradle cache structure
+show_progress "Initializing fresh Gradle cache structure..."
+mkdir -p /home/flutter/.gradle/caches/modules-2/files-2.1 2>/dev/null || true
+mkdir -p /home/flutter/.gradle/caches/transforms-3 2>/dev/null || true
+mkdir -p /home/flutter/.gradle/caches/build-cache-1 2>/dev/null || true
+chown -R flutter:flutter /home/flutter/.gradle 2>/dev/null || true
 
 show_success "File permissions updated"
 echo ""
@@ -389,20 +432,35 @@ if ! eval $BUILD_CMD 2>/dev/null; then
     show_info "Error details:"
     eval $BUILD_CMD 2>&1 || true
     
-    # Additional diagnostics for Gradle permission issues
-    show_info "=== Additional Diagnostics ==="
-    show_info "Gradle cache directory permissions:"
-    ls -la /home/flutter/.gradle/ 2>/dev/null || show_error "Cannot access Gradle cache directory"
-    
-    show_info "Current user and permissions:"
-    whoami
-    id
-    
-    show_info "Available disk space:"
-    df -h . 2>/dev/null || show_error "Cannot check disk space"
-    
-    show_info "Gradle cache directory contents:"
-    find /home/flutter/.gradle -type d 2>/dev/null | head -10 || show_error "Cannot list Gradle cache contents"
+    # Check if it's a Gradle cache corruption issue
+    BUILD_OUTPUT=$(eval $BUILD_CMD 2>&1 || true)
+    if echo "$BUILD_OUTPUT" | grep -q "CorruptedCacheException\|Corrupted IndexBlock\|file-access.bin" 2>/dev/null; then
+        show_warning "Detected Gradle cache corruption, attempting to clean and retry..."
+        clean_gradle_cache
+        
+        show_info "Retrying build after cache cleanup..."
+        if ! eval $BUILD_CMD 2>/dev/null; then
+            show_error "Build still failed after cache cleanup"
+            eval $BUILD_CMD 2>&1 || true
+        else
+            show_success "Build succeeded after cache cleanup!"
+        fi
+    else
+        # Additional diagnostics for other issues
+        show_info "=== Additional Diagnostics ==="
+        show_info "Gradle cache directory permissions:"
+        ls -la /home/flutter/.gradle/ 2>/dev/null || show_error "Cannot access Gradle cache directory"
+        
+        show_info "Current user and permissions:"
+        whoami
+        id
+        
+        show_info "Available disk space:"
+        df -h . 2>/dev/null || show_error "Cannot check disk space"
+        
+        show_info "Gradle cache directory contents:"
+        find /home/flutter/.gradle -type d 2>/dev/null | head -10 || show_error "Cannot list Gradle cache contents"
+    fi
     
     exit 1
 fi
