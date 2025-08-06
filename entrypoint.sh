@@ -152,10 +152,8 @@ detect_and_handle_alpine() {
         export LD_LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:$LD_LIBRARY_PATH"
         export LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:$LIBRARY_PATH"
         export ANDROID_AAPT2_FROM_MAVEN_OVERRIDE="/opt/android-sdk/build-tools/35.0.0/aapt2"
-        export ANDROID_AAPT2_DAEMON_MODE=false
         export CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION=clang
         export GLIBC_TUNABLES=glibc.pthread.stack_cache_size=0
-        export AAPT2_DAEMON_ENABLED=false
 
         # Create additional runtime symlinks for better compatibility
         show_info "Creating additional library symlinks for Android tools"
@@ -380,7 +378,6 @@ org.gradle.configureondemand=false
 android.useAndroidX=true
 android.enableJetifier=true
 android.enableR8.fullMode=false
-android.enableAapt2=false
 android.enableD8.desugaring=false
 android.enableBuildCache=false
 android.enableDexingArtifactTransform=false
