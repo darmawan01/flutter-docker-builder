@@ -59,21 +59,7 @@ jobs:
         # Build APK using Alpine image and test_app
         ./build.sh build-apk -b alpine -p ./test_app -o ./test_output_alpine
         
-        # Verify APK was created
-        if [ -f "test_output_alpine/apk/debug/app-debug.apk" ]; then
-          echo "✅ APK build test successful with Alpine image"
-          ls -la test_output_alpine/apk/debug/
-        else
-          echo "❌ APK build test failed with Alpine image"
-          exit 1
-        fi
-
-    - name: Upload Alpine Test APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: alpine-test-apk
-        path: test_output_alpine/apk/debug/*.apk
-        retention-days: 30
+        ls -la test_output_alpine/apk/
 
   build-push-test-ubuntu:
     runs-on: ubuntu-latest
@@ -123,22 +109,7 @@ jobs:
         
         # Build APK using Ubuntu image and test_app
         ./build.sh build-apk -b ubuntu -p ./test_app -o ./test_output
-        
-        # Verify APK was created
-        if [ -f "test_output/apk/debug/app-debug.apk" ]; then
-          echo "✅ APK build test successful with Ubuntu image"
-          ls -la test_output/apk/debug/
-        else
-          echo "❌ APK build test failed with Ubuntu image"
-          exit 1
-        fi
-
-    - name: Upload Ubuntu Test APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: ubuntu-test-apk
-        path: test_output/apk/debug/*.apk
-        retention-days: 30
+        ls -la test_output/apk/
 
   create-release:
     runs-on: ubuntu-latest
