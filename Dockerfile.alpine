@@ -37,6 +37,7 @@ RUN apk add --no-cache \
     build-base \
     linux-headers \
     && apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community \
+    
     musl-locales \
     musl-locales-lang \
     && rm -rf /var/cache/apk/*
@@ -69,11 +70,19 @@ RUN mkdir -p /lib64 /usr/lib64 \
     && ln -sf /usr/glibc-compat/lib/libutil.so.1 /usr/lib/libutil.so.1 \
     && ln -sf /usr/glibc-compat/lib/libresolv.so.2 /usr/lib/libresolv.so.2 \
     && ln -sf /usr/glibc-compat/lib/libstdc++.so.6 /usr/lib/libstdc++.so.6 \
-    && ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so.1
+    && ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so.1 \
+    && ln -sf /usr/glibc-compat/lib/libc.so.6 /lib64/libc.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libm.so.6 /lib64/libm.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libdl.so.2 /lib64/libdl.so.2 \
+    && ln -sf /usr/glibc-compat/lib/libpthread.so.0 /lib64/libpthread.so.0 \
+    && ln -sf /usr/glibc-compat/lib/librt.so.1 /lib64/librt.so.1 \
+    && ln -sf /usr/glibc-compat/lib/libutil.so.1 /lib64/libutil.so.1 \
+    && ln -sf /usr/glibc-compat/lib/libresolv.so.2 /lib64/libresolv.so.2 \
+    && ln -sf /usr/glibc-compat/lib/libstdc++.so.6 /lib64/libstdc++.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /lib64/libgcc_s.so.1
 
 # Add additional libraries needed by Android tools (avoiding gcompat conflicts)
-RUN apk add --no-cache libc6-compat && \
-    apk add --no-cache libstdc++ && \
+RUN apk add --no-cache libstdc++ && \
     apk add --no-cache cmake
 
 # Install ninja manually to avoid gcompat dependency
