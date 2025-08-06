@@ -57,10 +57,10 @@ RUN apt-get update -qq && \
 
 # Create non-root user first
 RUN useradd -m -s /bin/bash flutter && \
-    mkdir -p $ANDROID_HOME $FLUTTER_HOME && \
-    chown -R flutter:flutter $ANDROID_HOME $FLUTTER_HOME && \
+    mkdir -p "$ANDROID_HOME" "$FLUTTER_HOME" && \
+    chown -R flutter:flutter "$ANDROID_HOME" "$FLUTTER_HOME" && \
     # Ensure flutter user can access common directories
-    mkdir -p $PUB_CACHE && \
+    mkdir -p "$PUB_CACHE" && \
     chown -R flutter:flutter /home/flutter && \
     mkdir -p /output && \
     chown -R flutter:flutter /output && \
@@ -71,16 +71,16 @@ USER flutter
 RUN ANDROID_SDK_URL=$(curl -s "https://developer.android.com/studio/index.html" | \
     grep -oP 'commandlinetools-linux-\d+_latest\.zip' | head -1) && \
     curl -fsSL "https://dl.google.com/android/repository/${ANDROID_SDK_URL}" -o /tmp/cmdline-tools.zip && \
-    unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools && \
-    mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest && \
+    unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools" && \
+    mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" && \
     rm /tmp/cmdline-tools.zip
 
 # Install comprehensive Android SDK packages to avoid runtime downloads
 # This prevents the build process from downloading SDK platforms at runtime
 # which significantly improves build performance and reliability
-RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
-    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update && \
-    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+RUN yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses && \
+    "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --update && \
+    "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
         "platform-tools" \
         "platforms;android-${ANDROID_API_LEVEL}" \
         "platforms;android-${ANDROID_MIN_API_LEVEL}" \
@@ -103,9 +103,9 @@ RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
         "ndk;${NDK_VERSION}" \
         "cmake;3.22.1" && \
     # Clean up SDK manager cache to reduce image size
-    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat && \
-    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.cmd && \
-    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.exe
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" && \
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.cmd" && \
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.exe"
 
 # Install Flutter as flutter user
 RUN if [ -z "$FLUTTER_VERSION" ]; then \
@@ -122,7 +122,7 @@ WORKDIR /home/flutter
 
 # Configure Flutter
 RUN flutter precache && \
-    flutter config --android-sdk $ANDROID_HOME && \
+    flutter config --android-sdk "$ANDROID_HOME" && \
     yes | flutter doctor --android-licenses && \
     flutter doctor
 

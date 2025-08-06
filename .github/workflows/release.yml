@@ -9,53 +9,8 @@ env:
   IMAGE_NAME: darmawanz01/flutter-docker-builder
 
 jobs:
-  build-alpine:
+  build-push-test-alpine:
     runs-on: ubuntu-latest
-    outputs:
-      image-name: ${{ env.IMAGE_NAME }}-alpine
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build Alpine image
-      run: |
-        echo "Building Alpine-based Flutter Docker image..."
-        ./build.sh build-image -b alpine
-        
-        # Verify the image was built successfully
-        docker images | grep flutter-docker-builder || (echo "❌ Alpine image build failed" && exit 1)
-        echo "✅ Alpine image built successfully"
-
-  build-ubuntu:
-    runs-on: ubuntu-latest
-    outputs:
-      image-name: ${{ env.IMAGE_NAME }}-ubuntu
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build Ubuntu image
-      run: |
-        echo "Building Ubuntu-based Flutter Docker image..."
-        ./build.sh build-image -b ubuntu
-        
-        # Verify the image was built successfully
-        docker images | grep flutter-docker-builder || (echo "❌ Ubuntu image build failed" && exit 1)
-        echo "✅ Ubuntu image built successfully"
-
-  push-and-test:
-    runs-on: ubuntu-latest
-    needs: [build-alpine, build-ubuntu]
     permissions:
       contents: write
       packages: write
@@ -75,13 +30,14 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Generate tags
-      id: tags
+    - name: Build Alpine image
       run: |
-        # Generate safe tags for release
-        VERSION=${GITHUB_REF#refs/tags/}
-        echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_OUTPUT
-        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Building Alpine-based Flutter Docker image..."
+        ./build.sh build-image -b alpine
+        
+        # Verify the image was built successfully
+        docker images | grep flutter-docker-builder || (echo "❌ Alpine image build failed" && exit 1)
+        echo "✅ Alpine image built successfully"
 
     - name: Push Alpine image
       run: |
@@ -89,10 +45,64 @@ jobs:
         echo "Pushing Alpine image with tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine"
         
         # Tag and push Alpine image
-        docker tag flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine
-        docker tag flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
+        docker tag darmawanz01/flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine
+        docker tag darmawanz01/flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
         docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine
         docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
+
+    - name: Test APK Build with Alpine Image
+      run: |
+        echo "Testing APK build with Alpine image using test_app..."
+        mkdir -p test_output_alpine
+        
+        # Build APK using Alpine image and test_app
+        ./build.sh build-apk -b alpine -p ./test_app -o ./test_output_alpine
+        
+        # Verify APK was created
+        if [ -f "test_output_alpine/apk/debug/app-debug.apk" ]; then
+          echo "✅ APK build test successful with Alpine image"
+          ls -la test_output_alpine/apk/debug/
+        else
+          echo "❌ APK build test failed with Alpine image"
+          exit 1
+        fi
+
+    - name: Upload Alpine Test APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: alpine-test-apk
+        path: test_output_alpine/apk/debug/*.apk
+        retention-days: 30
+
+  build-push-test-ubuntu:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build Ubuntu image
+      run: |
+        echo "Building Ubuntu-based Flutter Docker image..."
+        ./build.sh build-image -b ubuntu
+        
+        # Verify the image was built successfully
+        docker images | grep flutter-docker-builder || (echo "❌ Ubuntu image build failed" && exit 1)
+        echo "✅ Ubuntu image built successfully"
 
     - name: Push Ubuntu image
       run: |
@@ -100,8 +110,8 @@ jobs:
         echo "Pushing Ubuntu image with tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
         
         # Tag and push Ubuntu image
-        docker tag flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
-        docker tag flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        docker tag darmawanz01/flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
+        docker tag darmawanz01/flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
         docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
         docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
@@ -122,31 +132,23 @@ jobs:
           exit 1
         fi
 
-    - name: Test APK Build with Alpine Image
-      run: |
-        echo "Testing APK build with Alpine image using test_app..."
-        mkdir -p test_output_alpine
-        
-        # Build APK using Alpine image and test_app
-        ./build.sh build-apk -b alpine -p ./test_app -o ./test_output_alpine
-        
-        # Verify APK was created
-        if [ -f "test_output_alpine/apk/debug/app-debug.apk" ]; then
-          echo "✅ APK build test successful with Alpine image"
-          ls -la test_output_alpine/apk/debug/
-        else
-          echo "❌ APK build test failed with Alpine image"
-          exit 1
-        fi
-
-    - name: Upload Test APKs as Artifacts
+    - name: Upload Ubuntu Test APK
       uses: actions/upload-artifact@v4
       with:
-        name: test-apks
-        path: |
-          test_output/apk/debug/*.apk
-          test_output_alpine/apk/debug/*.apk
+        name: ubuntu-test-apk
+        path: test_output/apk/debug/*.apk
         retention-days: 30
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [build-push-test-alpine, build-push-test-ubuntu]
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Generate release notes
       id: release_notes
@@ -183,13 +185,13 @@ jobs:
           
           **Ubuntu-based image (recommended):**
           ```bash
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           ```
           
           **Alpine-based image (lightweight):**
           ```bash
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}-alpine
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-alpine
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
           ```
           
@@ -200,7 +202,7 @@ jobs:
           docker run --rm \
             -v "$PROJECT_DIR:/app" \
             -v "$OUTPUT_DIR:/output" \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
           ```
           
           **Alpine image:**
@@ -208,7 +210,7 @@ jobs:
           docker run --rm \
             -v "$PROJECT_DIR:/app" \
             -v "$OUTPUT_DIR:/output" \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}-alpine
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-alpine
           ```
           
           ### Build Arguments
