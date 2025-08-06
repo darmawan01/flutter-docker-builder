@@ -1,10 +1,10 @@
-# Flutter Builder Docker Image
-# Usage: docker build --build-arg FLUTTER_VERSION=3.24.5 -t flutter-builder .
+# Flutter Builder Docker Image (Debian Bookworm)
+# Usage: docker build --build-arg FLUTTER_VERSION=3.32.4 -t flutter-builder:bookworm -f Dockerfile.bookworm .
 
-FROM ubuntu:24.04
+FROM debian:bookworm-slim
 
 LABEL maintainer="flutter-builder" \
-      description="Modern Flutter development environment with optimized Android SDK"
+      description="Modern Flutter development environment with Debian Bookworm"
 
 # Build arguments for flexible versioning
 ARG FLUTTER_VERSION="3.32.4"
@@ -141,4 +141,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD flutter doctor --machine > /dev/null || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/bin/bash"]
+CMD ["/bin/bash"] 

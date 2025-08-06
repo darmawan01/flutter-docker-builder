@@ -1,365 +1,259 @@
 # Flutter Docker Builder
 
-A modern, production-ready Docker image for building Flutter applications with Android SDK support. This image provides a complete Flutter development environment with the latest Android SDK, NDK, and build tools.
+A unified Docker-based Flutter development environment for building APKs with proper isolation and reproducible builds.
 
-## 🚀 Features
+## 🚀 Quick Start
 
-- **Latest Flutter SDK** (configurable version)
-- **Android SDK** with multiple API levels (30-35)
-- **Android NDK** for native code compilation
-- **Multiple build tools** versions for compatibility
-- **Non-root user** for security
-- **Health checks** for container monitoring
-- **Configurable build options** (flavor, obfuscation, shrinking, etc.)
-- **Beautiful colored output** with progress indicators
-- **Proper isolation** to prevent host system path conflicts
-
-## 📋 Prerequisites
-
-- Docker installed on your system
-- Flutter project with valid `pubspec.yaml`
-- Sufficient disk space (recommended: 10GB+)
-
-## 🏗️ Building the Image
-
-### Option 1: Build from Source
-
-Clone this repository and build the image locally:
+### Build Docker Images
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd flutter-docker-builder
+# Build Ubuntu image (default)
+./build.sh build-image
 
-# Build the image
-docker build -t flutter-docker-builder .
+# Build Bookworm image (smaller)
+./build.sh build-image -b bookworm
+
+# Custom configuration
+./build.sh build-image -a 35 -m 27 -f 3.32.4 -b bookworm
 ```
 
-### Option 2: Use Pre-built Image from Registry
-
-The latest image is automatically built and pushed to Docker Hub:
+### Build APKs
 
 ```bash
-# Pull the latest image
-docker pull ${{ github.repository }}:latest
-
-# Or pull a specific version
-docker pull ${{ github.repository }}:v1.0.0
-```
-
-#### Custom Build Arguments
-
-You can customize the build with these arguments:
-
-```bash
-docker build \
-  --build-arg FLUTTER_VERSION=3.32.4 \
-  --build-arg ANDROID_API_LEVEL=35 \
-  --build-arg JAVA_VERSION=17 \
-  --build-arg NDK_VERSION=27.0.12077973 \
-  -t flutter-docker-builder .
-```
-
-**Available Arguments:**
-- `FLUTTER_VERSION`: Flutter SDK version (default: 3.32.4)
-- `ANDROID_API_LEVEL`: Target Android API level (default: 35)
-- `JAVA_VERSION`: Java version (default: 17)
-- `NDK_VERSION`: Android NDK version (default: 27.0.12077973)
-
-## 🎯 Usage
-
-### Quick Start with Build Script
-
-The easiest way to build APKs is using the provided build script:
-
-```bash
-# Build release APK
-./build-apk.sh
+# Build APK with default settings
+./build.sh build-apk -p ./my_flutter_app
 
 # Build with custom options
-./build-apk.sh --project-dir /path/to/project --output-dir ./apks --build-mode release
+./build.sh build-apk -p ./my_app -o ./output --obfuscate --shrink
 
-# Build with flavor
-./build-apk.sh --flavor production
-
-# Build with obfuscation
-./build-apk.sh --obfuscate --shrink
+# Build using Bookworm image
+./build.sh build-apk -p ./my_app -b bookworm
 ```
 
-### Basic Docker Usage
+### Compare Image Sizes
 
 ```bash
-docker run --rm \
-  -v "$PROJECT_DIR:/app" \
-  -v "$OUTPUT_DIR:/output" \
-  flutter-docker-builder:latest
+# Compare Ubuntu vs Bookworm sizes
+./build.sh compare
 ```
 
-### Advanced Usage with Environment Variables
+### Clean Up
 
 ```bash
-docker run --rm \
-  -v "$PROJECT_DIR:/app" \
-  -v "$OUTPUT_DIR:/output" \
-  -e BUILD_MODE=release \
-  -e TARGET_PLATFORM=android-arm64 \
-  -e FLAVOR=production \
-  -e OBFUSCATE=true \
-  -e SHRINK=true \
-  -e SPLIT_PER_ABI=true \
-  flutter-docker-builder:latest
+# Remove all images
+./build.sh clean
 ```
 
-### Interactive Mode
+## Comprehensive SDK Platform Installation
+Added pre-installation of commonly used Android SDK platforms:
+- `android-28` (API 28)
+- `android-29` (API 29) 
+- `android-30` (API 30)
+- `android-31` (API 31)
+- `android-32` (API 32)
+- `android-33` (API 33)
+- `android-34` (API 34)
 
-For debugging or development:
+## Comprehensive Build Tools Installation
+Added pre-installation of corresponding build tools:
+- `build-tools;28.0.3`
+- `build-tools;29.0.3`
+- `build-tools;30.0.3`
+- `build-tools;31.0.0`
+- `build-tools;32.0.0`
+- `build-tools;33.0.0`
+- `build-tools;34.0.0`
 
-```bash
-docker run --rm -it \
-  -v "$PROJECT_DIR:/app" \
-  -v "$OUTPUT_DIR:/output" \
-  flutter-docker-builder:latest /bin/bash
-```
+## 📦 Available Images
+
+### Ubuntu 24.04 (`Dockerfile`)
+- **Base**: Ubuntu 24.04
+- **Size**: ~2-3GB
+- **Use for**: Development, debugging, team familiarity
+- **Features**: Full compatibility, familiar environment
+
+### Debian Bookworm (`Dockerfile.bookworm`)
+- **Base**: Debian Bookworm Slim
+- **Size**: ~1.5-2GB (30-40% smaller)
+- **Use for**: Production, CI/CD, resource-constrained environments
+- **Features**: Smaller size, faster deployments
+
+### Alpine (`Dockerfile.alpine`)
+- **Base**: Alpine 3.21
+- **Size**: ~1.2-1.5GB (50-60% smaller than Ubuntu)
+- **Use for**: Production, CI/CD, minimal deployments
+- **Features**: Smallest size, fastest deployments, glibc compatibility layer
 
 ## ⚙️ Configuration
 
+### Default Settings
+- **Flutter Version**: 3.32.4
+- **Android API Level**: 35 (Android 15)
+- **Minimum API Level**: 27 (Android 8.1+)
+- **Java Version**: 17
+- **NDK Version**: 27.0.12077973
+
+### Build Arguments
+
+```bash
+./build.sh build-image \
+  -f 3.32.4 \
+  -a 35 \
+  -m 27 \
+  -j 17 \
+  -n 27.0.12077973 \
+  -i darmawanz01/flutter-docker-builder \
+  -b bookworm
+```
+
+### APK Build Options
+
+```bash
+./build.sh build-apk \
+  -p ./my_app \
+  -o ./output \
+  --build-mode release \
+  --target-platform android-arm64 \
+  --flavor production \
+  --obfuscate \
+  --shrink \
+  --split-per-abi
+```
+
+## 🎯 Usage Examples
+
+### Basic Workflow
+
+```bash
+# 1. Build Ubuntu image
+./build.sh build-image
+
+# 2. Build APK
+./build.sh build-apk -p ./my_app
+
+# 3. Compare sizes
+./build.sh compare
+
+# 4. Clean up when done
+./build.sh clean
+```
+
+### Production Workflow
+
+```bash
+# 1. Build Bookworm image (smaller)
+./build.sh build-image -b bookworm -i my-flutter:prod
+
+# 2. Build optimized APK
+./build.sh build-apk -p ./my_app -b bookworm --obfuscate --shrink
+
+# 3. Clean up
+./build.sh clean
+```
+
+### CI/CD Example
+
+```bash
+# Build and use in one command
+./build.sh build-apk -p ./my_app -b bookworm -o ./artifacts
+```
+
+## 📊 Size Comparison
+
+| Image Type | Base | Size | Use Case |
+|------------|------|------|----------|
+| Ubuntu | Ubuntu 24.04 | ~2-3GB | Development, debugging |
+| Bookworm | Debian Bookworm | ~1.5-2GB | Production, CI/CD |
+
+## 🔧 Script Commands
+
+### `build-image`
+Builds a Docker image with Flutter and Android SDK.
+
+**Options:**
+- `-f, --flutter-version`: Flutter version
+- `-a, --android-api-level`: Target Android API level
+- `-m, --min-api-level`: Minimum Android API level
+- `-j, --java-version`: Java version
+- `-n, --ndk-version`: NDK version
+- `-i, --image-name`: Docker image name
+- `-b, --base`: Base image (ubuntu/bookworm)
+
+### `build-apk`
+Builds APK from Flutter project.
+
+**Options:**
+- `-p, --project-dir`: Project directory
+- `-o, --output-dir`: Output directory
+- `--build-mode`: Build mode (debug/profile/release)
+- `--target-platform`: Target platform
+- `--flavor`: Build flavor
+- `--obfuscate`: Enable obfuscation
+- `--shrink`: Enable shrinking
+- `--split-per-abi`: Split APK per ABI
+
+### `compare`
+Compares sizes of Ubuntu and Bookworm images.
+
+### `clean`
+Removes all Docker images.
+
+## 🏗️ Project Structure
+
+```
+flutter-docker-builder/
+├── build.sh              # Unified build script
+├── Dockerfile            # Ubuntu-based image
+├── Dockerfile.bookworm   # Debian Bookworm-based image
+├── entrypoint.sh         # Container entrypoint
+├── test_app/            # Test Flutter application
+└── README.md            # This file
+```
+
+## 📋 Requirements
+
+- Docker
+- Bash shell
+- Internet connection for downloading Flutter and Android SDK
+
+## 🎯 Benefits
+
+- **Unified Script**: One script handles everything
+- **Two Base Images**: Choose Ubuntu or Bookworm
+- **Optimized Size**: Bookworm is 30-40% smaller
+- **Flexible Configuration**: Easy to customize
+- **Production Ready**: Suitable for CI/CD
+- **Clean Interface**: Simple command structure
+
+## 🚀 Advanced Usage
+
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BUILD_MODE` | `release` | Build mode (debug, profile, release) |
-| `TARGET_PLATFORM` | `android-arm64` | Target platform (android-arm, android-arm64, android-x64) |
-| `FLAVOR` | `` | Build flavor (optional) |
-| `OBFUSCATE` | `false` | Enable code obfuscation |
-| `SHRINK` | `false` | Enable code shrinking |
-| `SPLIT_PER_ABI` | `false` | Split APK per ABI |
-
-### Volume Mounts
-
-| Mount Point | Purpose |
-|-------------|---------|
-| `/app` | Source Flutter project directory |
-| `/output` | Output directory for generated APKs |
-
-## 📁 Project Structure
-
-Your Flutter project should be mounted to `/app` and contain:
-
-```
-/app/
-├── pubspec.yaml
-├── lib/
-├── android/
-├── ios/
-└── ...
+```bash
+export FLUTTER_VERSION=3.32.4
+export ANDROID_API_LEVEL=35
+export ANDROID_MIN_API_LEVEL=27
+export BASE_TYPE=bookworm
+./build.sh build-image
 ```
 
-## 📦 Output
-
-Generated APK files will be available in the mounted output directory:
-
-```
-/output/
-├── apk/
-│   ├── debug/
-│   │   └── app-debug.apk
-│   └── release/
-│       └── app-release.apk
-└── bundle/
-    └── release/
-        └── app-release.aab
-```
-
-## 🔧 Examples
-
-### Build Release APK
+### Custom Image Names
 
 ```bash
-# Set your project and output directories
-export PROJECT_DIR="/path/to/your/flutter/project"
-export OUTPUT_DIR="/path/to/output"
-
-# Build release APK
-docker run --rm \
-  -v "$PROJECT_DIR:/app" \
-  -v "$OUTPUT_DIR:/output" \
-  -e BUILD_MODE=release \
-  flutter-docker-builder:latest
+./build.sh build-image -i my-company/darmawanz01-flutter-builder -b bookworm
 ```
 
-### Build with Flavor
+### Multiple Builds
 
 ```bash
-docker run --rm \
-  -v "$PROJECT_DIR:/app" \
-  -v "$OUTPUT_DIR:/output" \
-  -e BUILD_MODE=release \
-  -e FLAVOR=staging \
-  flutter-docker-builder:latest
+# Build both images
+./build.sh build-image -b ubuntu
+./build.sh build-image -b bookworm
+
+# Compare them
+./build.sh compare
 ```
-
-### Build Obfuscated APK
-
-```bash
-docker run --rm \
-  -v "$PROJECT_DIR:/app" \
-  -v "$OUTPUT_DIR:/output" \
-  -e BUILD_MODE=release \
-  -e OBFUSCATE=true \
-  -e SHRINK=true \
-  flutter-docker-builder:latest
-```
-
-### Build for Multiple ABIs
-
-```bash
-docker run --rm \
-  -v "$PROJECT_DIR:/app" \
-  -v "$OUTPUT_DIR:/output" \
-  -e BUILD_MODE=release \
-  -e SPLIT_PER_ABI=true \
-  flutter-docker-builder:latest
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Permission Denied**
-   ```bash
-   # Ensure output directory has correct permissions
-   mkdir -p "$OUTPUT_DIR" && chmod 755 "$OUTPUT_DIR"
-   ```
-
-2. **Out of Memory**
-   ```bash
-   # Increase Docker memory limit
-   docker run --rm --memory=4g \
-     -v "$PROJECT_DIR:/app" \
-     -v "$OUTPUT_DIR:/output" \
-     flutter-docker-builder:latest
-   ```
-
-3. **Build Fails**
-   ```bash
-   # Run in interactive mode to debug
-   docker run --rm -it \
-     -v "$PROJECT_DIR:/app" \
-     -v "$OUTPUT_DIR:/output" \
-     flutter-docker-builder:latest /bin/bash
-   ```
-
-4. **Directory Creation Error**
-   
-   If you encounter an error like:
-   ```
-   Failed to create parent directory '/Users' when creating directory '/Users/zd/Nguli/alexys/aptus_aware3/build/app/intermediates/flutter/release/arm64-v8a'
-   ```
-   
-   This happens when the build process tries to access host system paths. The fix includes:
-   
-   - **Use the build script**: `./build-apk.sh` handles proper isolation
-   - **Ensure proper volume mounting**: Use absolute paths for project and output directories
-   - **Clean build environment**: The container now cleans build artifacts before building
-   - **Proper environment variables**: Set `FLUTTER_BUILD_DIR` and other paths within the container
-   
-   ```bash
-   # Use the build script (recommended)
-   ./build-apk.sh --project-dir /path/to/project --output-dir ./output
-   
-   # Or ensure proper Docker run command
-   docker run --rm \
-     -v "$(realpath /path/to/project):/app" \
-     -v "$(realpath ./output):/output" \
-     -e FLUTTER_BUILD_DIR="/home/flutter/projects/build" \
-     flutter-docker-builder:latest
-   ```
-
-### Health Check
-
-The container includes a health check that verifies Flutter installation:
-
-```bash
-docker inspect --format='{{.State.Health.Status}}' <container_id>
-```
-
-## 🔒 Security
-
-- Runs as non-root user (`flutter`)
-- Uses official Ubuntu 24.04 base image
-- Minimal attack surface with only necessary packages
-- Regular security updates recommended
-
-## 📊 Performance
-
-- Multi-stage build optimization
-- Layer caching for faster rebuilds
-- Parallel dependency installation
-- Optimized for CI/CD pipelines
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 🔄 CI/CD Pipeline
-
-This project includes automated CI/CD pipelines for building, testing, and releasing Docker images:
-
-### Workflows
-
-1. **Build and Push** (`.github/workflows/docker-build.yml`)
-   - Triggers on pushes to main/master and version tags
-   - Builds multi-platform images (amd64, arm64)
-   - Pushes to Docker Hub with proper tagging
-   - Generates SBOM for security
-
-2. **Security Scan** (`.github/workflows/security-scan.yml`)
-   - Scans Docker images for vulnerabilities using Trivy
-   - Runs on every push and weekly schedule
-   - Uploads results to GitHub Security tab
-
-3. **Test Build** (`.github/workflows/test-build.yml`)
-   - Tests image builds with different Flutter versions
-   - Verifies APK generation works correctly
-   - Matrix testing with multiple configurations
-
-4. **Release** (`.github/workflows/release.yml`)
-   - Creates GitHub releases on version tags
-   - Generates release notes automatically
-   - Pushes latest and versioned tags
-
-### Setup Requirements
-
-To enable the CI/CD pipeline, add these secrets to your GitHub repository:
-
-- `DOCKER_USERNAME`: Your Docker Hub username
-- `DOCKER_PASSWORD`: Your Docker Hub access token
-
-And these variables (optional, for customization):
-- `FLUTTER_VERSION`: Flutter SDK version (default: 3.32.4)
-- `ANDROID_API_LEVEL`: Android API level (default: 35)
-- `JAVA_VERSION`: Java version (default: 17)
-- `NDK_VERSION`: NDK version (default: 27.0.12077973)
-
-### Automated Updates
-
-Dependabot is configured to automatically:
-- Update GitHub Actions to latest versions
-- Update Docker base images
-- Create pull requests for security updates
 
 ## 📄 License
 
-[Add your license information here]
-
-## 🆘 Support
-
-For issues and questions:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the Docker logs: `docker logs <container_id>`
-- Check GitHub Actions for build status
+MIT License - see LICENSE file for details.

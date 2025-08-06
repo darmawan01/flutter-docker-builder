@@ -1,0 +1,151 @@
+# Flutter Builder Docker Image (Alpine Linux)
+# Usage: docker build --build-arg FLUTTER_VERSION=3.32.4 -t flutter-builder:alpine -f Dockerfile.alpine .
+
+FROM alpine:3.21
+
+LABEL maintainer="flutter-builder" \
+      description="Minimal Flutter development environment with Android SDK and glibc on Alpine"
+
+# Build arguments for flexible versioning
+ARG FLUTTER_VERSION="3.32.4"
+ARG ANDROID_API_LEVEL="35"
+ARG ANDROID_MIN_API_LEVEL="27"
+ARG JAVA_VERSION="17"
+ARG NDK_VERSION="27.0.12077973"
+ARG GLIBC_VERSION="2.35-r1"
+
+# Environment variables
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    ANDROID_HOME="/opt/android-sdk" \
+    FLUTTER_HOME="/opt/flutter" \
+    JAVA_HOME="/usr/lib/jvm/java-${JAVA_VERSION}-openjdk" \
+    FLUTTER_BUILD_DIR="/home/flutter/projects/build" \
+    PUB_CACHE="/home/flutter/.pub-cache" \
+    ANDROID_SDK_ROOT="$ANDROID_HOME" \
+    PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/ndk/$NDK_VERSION:$FLUTTER_HOME/bin:/usr/glibc-compat/bin"
+
+# Install system dependencies with additional build tools
+RUN apk add --no-cache \
+    bash \
+    curl \
+    git \
+    unzip \
+    zip \
+    openjdk${JAVA_VERSION}-jdk \
+    cmake \
+    ninja \
+    pkgconf \
+    build-base \
+    linux-headers \
+    && apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community \
+    musl-locales \
+    musl-locales-lang \
+    && rm -rf /var/cache/apk/*
+
+# Install gosu
+RUN wget -q -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/1.17/gosu-amd64" \
+    && chmod +x /usr/local/bin/gosu \
+    && gosu --version
+
+# Install glibc compatibility layer with improved setup
+RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub \
+    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk \
+    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-bin-${GLIBC_VERSION}.apk \
+    && wget -q https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-i18n-${GLIBC_VERSION}.apk \
+    && apk add --no-cache --force-overwrite glibc-${GLIBC_VERSION}.apk glibc-bin-${GLIBC_VERSION}.apk glibc-i18n-${GLIBC_VERSION}.apk \
+    && /usr/glibc-compat/bin/localedef -i en_US -f UTF-8 en_US.UTF-8 \
+    && rm -f glibc-${GLIBC_VERSION}.apk glibc-bin-${GLIBC_VERSION}.apk glibc-i18n-${GLIBC_VERSION}.apk \
+    && rm -rf /var/cache/apk/*
+
+# Create symbolic links for better glibc compatibility
+RUN ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 \
+    && ln -sf /usr/glibc-compat/lib/libc.so.6 /lib64/libc.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libm.so.6 /lib64/libm.so.6 \
+    && ln -sf /usr/glibc-compat/lib/libdl.so.2 /lib64/libdl.so.2 \
+    && ln -sf /usr/glibc-compat/lib/libpthread.so.0 /lib64/libpthread.so.0 \
+    && ln -sf /usr/glibc-compat/lib/libresolv.so.2 /lib64/libresolv.so.2 \
+    && ln -sf /usr/glibc-compat/lib/librt.so.1 /lib64/librt.so.1 \
+    && ln -sf /usr/glibc-compat/lib/libutil.so.1 /lib64/libutil.so.1
+
+# Create non-root user and directories
+RUN adduser -D -h /home/flutter flutter \
+    && mkdir -p $ANDROID_HOME $FLUTTER_HOME $PUB_CACHE /output $FLUTTER_BUILD_DIR /home/flutter/.android \
+    && touch /home/flutter/.android/repositories.cfg \
+    && chown -R flutter:flutter /home/flutter $ANDROID_HOME $FLUTTER_HOME /output
+
+# Install Android SDK Command Line Tools as root
+RUN curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip" -o /tmp/cmdline-tools.zip \
+    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools \
+    && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip \
+    && chown -R flutter:flutter $ANDROID_HOME
+
+# Install Flutter as root
+RUN if [ -z "$FLUTTER_VERSION" ]; then \
+        FLUTTER_VERSION=$(curl -fsSL https://api.github.com/repos/flutter/flutter/releases/latest | \
+        grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'); \
+    fi \
+    && echo "Installing Flutter version: $FLUTTER_VERSION" \
+    && curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
+        -o /tmp/flutter.tar.xz \
+    && tar xf /tmp/flutter.tar.xz -C /opt/ \
+    && rm /tmp/flutter.tar.xz \
+    && chown -R flutter:flutter $FLUTTER_HOME
+
+# Switch to flutter user
+USER flutter
+
+# Set PATH for flutter user
+ENV PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/ndk/$NDK_VERSION:$FLUTTER_HOME/bin:/usr/glibc-compat/bin"
+
+# Install comprehensive Android SDK packages to avoid runtime downloads
+# This prevents the build process from downloading SDK platforms at runtime
+# which significantly improves build performance and reliability
+RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses \
+    && $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update \
+    && $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+        "platform-tools" \
+        "platforms;android-${ANDROID_API_LEVEL}" \
+        "platforms;android-${ANDROID_MIN_API_LEVEL}" \
+        "platforms;android-34" \
+        "platforms;android-33" \
+        "platforms;android-32" \
+        "platforms;android-31" \
+        "platforms;android-30" \
+        "platforms;android-29" \
+        "platforms;android-28" \
+        "build-tools;${ANDROID_API_LEVEL}.0.0" \
+        "build-tools;34.0.0" \
+        "build-tools;33.0.0" \
+        "build-tools;32.0.0" \
+        "build-tools;31.0.0" \
+        "build-tools;30.0.3" \
+        "build-tools;29.0.3" \
+        "build-tools;28.0.3" \
+        "cmdline-tools;latest" \
+        "ndk;${NDK_VERSION}" \
+        "cmake;3.22.1" && \
+    # Clean up SDK manager cache to reduce image size
+    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat && \
+    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.cmd && \
+    rm -rf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.exe
+
+# Configure Flutter
+RUN flutter precache \
+    && flutter config --android-sdk $ANDROID_HOME \
+    && yes | flutter doctor --android-licenses \
+    && flutter doctor
+
+# Set working directory
+WORKDIR /home/flutter/projects
+
+# Copy entrypoint script (you'll need to provide this or adapt it)
+COPY entrypoint.sh /usr/local/bin/
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD flutter doctor --machine > /dev/null || exit 1
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/bin/bash"]
