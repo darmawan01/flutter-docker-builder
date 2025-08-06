@@ -79,6 +79,49 @@ jobs:
         docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
         docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
+    - name: Test APK Build with Ubuntu Image
+      run: |
+        echo "Testing APK build with Ubuntu image using test_app..."
+        mkdir -p test_output
+        
+        # Build APK using Ubuntu image and test_app
+        ./build.sh build-apk -b ubuntu -p ./test_app -o ./test_output
+        
+        # Verify APK was created
+        if [ -f "test_output/apk/debug/app-debug.apk" ]; then
+          echo "✅ APK build test successful with Ubuntu image"
+          ls -la test_output/apk/debug/
+        else
+          echo "❌ APK build test failed with Ubuntu image"
+          exit 1
+        fi
+
+    - name: Test APK Build with Alpine Image
+      run: |
+        echo "Testing APK build with Alpine image using test_app..."
+        mkdir -p test_output_alpine
+        
+        # Build APK using Alpine image and test_app
+        ./build.sh build-apk -b alpine -p ./test_app -o ./test_output_alpine
+        
+        # Verify APK was created
+        if [ -f "test_output_alpine/apk/debug/app-debug.apk" ]; then
+          echo "✅ APK build test successful with Alpine image"
+          ls -la test_output_alpine/apk/debug/
+        else
+          echo "❌ APK build test failed with Alpine image"
+          exit 1
+        fi
+
+    - name: Upload Test APKs as Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-apks
+        path: |
+          test_output/apk/debug/*.apk
+          test_output_alpine/apk/debug/*.apk
+        retention-days: 30
+
     - name: Generate release notes
       id: release_notes
       uses: actions/github-script@v7
@@ -147,5 +190,9 @@ jobs:
           - Android API Level: ${{ vars.ANDROID_API_LEVEL || '35' }}
           - Java Version: ${{ vars.JAVA_VERSION || '17' }}
           - NDK Version: ${{ vars.NDK_VERSION || '27.0.12077973' }}
+          
+          ### Test Results
+          ✅ Both Ubuntu and Alpine images successfully built APKs from test_app
+          📦 Test APKs are available as GitHub artifacts
         draft: false
         prerelease: false 
