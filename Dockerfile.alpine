@@ -66,20 +66,8 @@ RUN ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.
     && ln -sf /usr/glibc-compat/lib/librt.so.1 /lib64/librt.so.1 \
     && ln -sf /usr/glibc-compat/lib/libutil.so.1 /lib64/libutil.so.1
 
-# Install CMake and Ninja from source for better compatibility
-RUN cd /tmp \
-    && wget -q https://github.com/Kitware/CMake/releases/download/v3.22.1/cmake-3.22.1.tar.gz \
-    && tar xf cmake-3.22.1.tar.gz \
-    && cd cmake-3.22.1 \
-    && ./bootstrap --parallel=$(nproc) \
-    && make -j$(nproc) \
-    && make install \
-    && cd /tmp \
-    && rm -rf cmake-3.22.1* \
-    && wget -q https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-linux.zip \
-    && unzip -q ninja-linux.zip \
-    && mv ninja /usr/local/bin/ \
-    && rm ninja-linux.zip
+# Install CMake and Ninja from Alpine packages for better compatibility
+RUN apk add --no-cache cmake ninja
 
 # Create non-root user and directories
 RUN adduser -D -h /home/flutter flutter \
