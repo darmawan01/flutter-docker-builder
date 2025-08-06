@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: darmawanz01/flutter-docker-builder
 
 jobs:
   release:
@@ -39,20 +39,45 @@ jobs:
         echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_OUTPUT
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.tags.outputs.tags }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        build-args: |
-          FLUTTER_VERSION=${{ vars.FLUTTER_VERSION || '3.32.4' }}
-          ANDROID_API_LEVEL=${{ vars.ANDROID_API_LEVEL || '35' }}
-          JAVA_VERSION=${{ vars.JAVA_VERSION || '17' }}
-          NDK_VERSION=${{ vars.NDK_VERSION || '27.0.12077973' }}
+    - name: Build Alpine image
+      run: |
+        echo "Building Alpine-based Flutter Docker image..."
+        ./build.sh build-image -b alpine
+        
+        # Verify the image was built successfully
+        docker images | grep flutter-docker-builder || (echo "❌ Alpine image build failed" && exit 1)
+        echo "✅ Alpine image built successfully"
+
+    - name: Build Ubuntu image
+      run: |
+        echo "Building Ubuntu-based Flutter Docker image..."
+        ./build.sh build-image -b ubuntu
+        
+        # Verify the image was built successfully
+        docker images | grep flutter-docker-builder || (echo "❌ Ubuntu image build failed" && exit 1)
+        echo "✅ Ubuntu image built successfully"
+
+    - name: Push Alpine image
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "Pushing Alpine image with tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine"
+        
+        # Tag and push Alpine image
+        docker tag flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine
+        docker tag flutter-docker-builder:alpine ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-alpine
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
+
+    - name: Push Ubuntu image
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "Pushing Ubuntu image with tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        
+        # Tag and push Ubuntu image
+        docker tag flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
+        docker tag flutter-docker-builder:ubuntu ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
     - name: Generate release notes
       id: release_notes
@@ -85,17 +110,36 @@ jobs:
           ### What's Changed
           ${{ steps.release_notes.outputs.result }}
           
-          ### Docker Image
+          ### Docker Images
+          
+          **Ubuntu-based image (recommended):**
           ```bash
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ```
+          
+          **Alpine-based image (lightweight):**
+          ```bash
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}-alpine
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine
           ```
           
           ### Usage
+          
+          **Ubuntu image:**
           ```bash
           docker run --rm \
             -v "$PROJECT_DIR:/app" \
             -v "$OUTPUT_DIR:/output" \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          ```
+          
+          **Alpine image:**
+          ```bash
+          docker run --rm \
+            -v "$PROJECT_DIR:/app" \
+            -v "$OUTPUT_DIR:/output" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}-alpine
           ```
           
           ### Build Arguments
