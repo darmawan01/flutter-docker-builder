@@ -149,8 +149,8 @@ detect_and_handle_alpine() {
         fi
 
         # Android tools compatibility fixes
-        export LD_LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:$LD_LIBRARY_PATH"
-        export LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:$LIBRARY_PATH"
+        export LD_LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
+        export LIBRARY_PATH="/usr/glibc-compat/lib:/usr/lib:/lib64:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:$LIBRARY_PATH"
         export ANDROID_AAPT2_FROM_MAVEN_OVERRIDE="/opt/android-sdk/build-tools/35.0.0/aapt2"
         export CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION=clang
         export GLIBC_TUNABLES=glibc.pthread.stack_cache_size=0
@@ -158,6 +158,9 @@ detect_and_handle_alpine() {
         # Create additional runtime symlinks for better compatibility
         show_info "Creating additional library symlinks for Android tools"
         mkdir -p /usr/lib/x86_64-linux-gnu 2>/dev/null || true
+        mkdir -p /lib/x86_64-linux-gnu 2>/dev/null || true
+        
+        # Create symlinks for all required libraries
         ln -sf /usr/glibc-compat/lib/libc.so.6 /usr/lib/x86_64-linux-gnu/libc.so.6 2>/dev/null || true
         ln -sf /usr/glibc-compat/lib/libm.so.6 /usr/lib/x86_64-linux-gnu/libm.so.6 2>/dev/null || true
         ln -sf /usr/glibc-compat/lib/libdl.so.2 /usr/lib/x86_64-linux-gnu/libdl.so.2 2>/dev/null || true
@@ -167,6 +170,31 @@ detect_and_handle_alpine() {
         ln -sf /usr/glibc-compat/lib/libutil.so.1 /usr/lib/x86_64-linux-gnu/libutil.so.1 2>/dev/null || true
         ln -sf /usr/glibc-compat/lib/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so.6 2>/dev/null || true
         ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 2>/dev/null || true
+        
+        # Also create symlinks in /lib/x86_64-linux-gnu for broader compatibility
+        ln -sf /usr/glibc-compat/lib/libc.so.6 /lib/x86_64-linux-gnu/libc.so.6 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libm.so.6 /lib/x86_64-linux-gnu/libm.so.6 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libdl.so.2 /lib/x86_64-linux-gnu/libdl.so.2 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libpthread.so.0 /lib/x86_64-linux-gnu/libpthread.so.0 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libresolv.so.2 /lib/x86_64-linux-gnu/libresolv.so.2 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/librt.so.1 /lib/x86_64-linux-gnu/librt.so.1 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libutil.so.1 /lib/x86_64-linux-gnu/libutil.so.1 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libstdc++.so.6 /lib/x86_64-linux-gnu/libstdc++.so.6 2>/dev/null || true
+        ln -sf /usr/glibc-compat/lib/libgcc_s.so.1 /lib/x86_64-linux-gnu/libgcc_s.so.1 2>/dev/null || true
+
+        # Verify critical libraries are accessible
+        show_info "Verifying library accessibility..."
+        if [ -f "/usr/glibc-compat/lib/libgcc_s.so.1" ]; then
+            show_success "libgcc_s.so.1 is available"
+        else
+            show_warning "libgcc_s.so.1 not found in glibc-compat"
+        fi
+        
+        if [ -f "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1" ]; then
+            show_success "libgcc_s.so.1 symlink created successfully"
+        else
+            show_warning "libgcc_s.so.1 symlink creation failed"
+        fi
 
         show_success "Alpine compatibility fixes applied"
     fi
