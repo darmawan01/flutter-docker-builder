@@ -371,15 +371,22 @@ if [ -d "android" ]; then
     # Add Alpine-specific Android configuration
     if [ -f /etc/alpine-release ]; then
         show_info "Configuring Alpine-specific Android settings"
-        # Create gradle.properties with Alpine optimizations
-        cat > android/gradle.properties << EOF
-org.gradle.jvmargs=-Xmx2g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false
-org.gradle.configureondemand=false
-android.useAndroidX=true
-android.enableJetifier=true
-android.enableR8.fullMode=false
-EOF
-        show_success "Alpine-specific Android configuration added"
+        # Update existing gradle.properties with Alpine optimizations
+        if [ -f "android/gradle.properties" ]; then
+            # Backup original gradle.properties
+            cp android/gradle.properties android/gradle.properties.backup
+            # Update with Alpine-optimized JVM args
+            sed -i 's/org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx2g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false/' android/gradle.properties
+                    show_success "Updated existing gradle.properties with Alpine optimizations"
+        
+            # Check and remove any deprecated settings from gradle.properties
+            show_info "Checking for deprecated Android settings..."
+            sed -i '/android.enableAapt2/d' android/gradle.properties 2>/dev/null || true
+            sed -i '/android.enableD8.desugaring/d' android/gradle.properties 2>/dev/null || true
+            sed -i '/android.enableBuildCache/d' android/gradle.properties 2>/dev/null || true
+            sed -i '/android.enableDexingArtifactTransform/d' android/gradle.properties 2>/dev/null || true
+            show_success "Removed deprecated Android settings"
+        fi
     fi
     
     show_success "Android local.properties configured"
