@@ -1,7 +1,7 @@
 # Flutter Builder Docker Image (Alpine Linux)
 # Usage: docker build --build-arg FLUTTER_VERSION=3.32.4 -t flutter-builder:alpine -f Dockerfile.alpine .
 
-FROM alpine:3.21
+FROM alpine:3.22
 
 LABEL maintainer="flutter-builder" \
       description="Minimal Flutter development environment with Android SDK and glibc on Alpine"
